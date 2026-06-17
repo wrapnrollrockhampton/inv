@@ -1,6 +1,6 @@
 // Wrap&Roll Rockhampton — Service Worker
 // Minimal cache strategy: cache the app shell, always go to network for API calls
-var CACHE_NAME = 'wraproll-v1';
+var CACHE_NAME = 'wraproll-v2';
 var APP_SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function(e){
