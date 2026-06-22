@@ -85,6 +85,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 
 /* ── SCROLL AREA ── */
 .scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px 32px;min-width:0}
+#ptr-indicator{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-10px);z-index:900;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
+#ptr-indicator .ptr-spin{width:18px;height:18px;border:2.5px solid #e5e7eb;border-top-color:var(--blue);border-radius:50%}
+#ptr-indicator.spinning .ptr-spin{animation:ptrspin .6s linear infinite}
+@keyframes ptrspin{to{transform:rotate(360deg)}}
 
 /* ── SIDEBAR ── */
 #app-body{flex:1;display:flex;overflow:hidden;position:relative}
@@ -403,6 +407,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
   </div>
 
   <div id="app-body">
+    <div id="ptr-indicator"><div class="ptr-spin"></div></div>
     <div id="sidebar">
       <div id="sidebar-inner">
         <button class="snav-btn active" id="bn-dash" onclick="gp('dash','Dashboard')"><span class="snav-icon">📊</span><span>Dashboard</span></button>
@@ -412,7 +417,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v1.7</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v1.8</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -884,6 +889,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         </div>
       </div>
       <div id="u-msg" style="margin-bottom:8px"></div>
+      <button id="u-delete-btn" onclick="deleteUserConfirm()" style="display:none;width:100%;padding:11px;border-radius:10px;border:1px solid var(--red-b,#fecaca);background:#fef2f2;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px">🗑 Delete this user</button>
     </div>
     <div class="mfoot">
       <button class="action-btn btn-ghost" onclick="cm('m-user')">Cancel</button>
@@ -2349,6 +2355,7 @@ function openAddUser(){
   g('u-pw-label').textContent='Password';
   g('u-rate').value='0';g('u-daily').value='0';g('u-super').value='11.5';g('u-sat').value='1.25';g('u-sun').value='1.5';g('u-ph').value='2.0';
   g('u-msg').innerHTML='';
+  if(g('u-delete-btn')) g('u-delete-btn').style.display='none';
   togglePayrollFields();
   om('m-user');
 }
@@ -2369,7 +2376,23 @@ function openEditUser(username,fullname,role,hourlyRate,satRate,sunRate,phRate,s
   g('u-ph').value=phRate||2.0;
   g('u-msg').innerHTML='';
   togglePayrollFields();
+  // Show delete button — but not for the built-in admin or the current user
+  var realName=(REAL_ADMIN?REAL_ADMIN.username:(U?U.username:'')).toLowerCase();
+  var canDelete=username.toLowerCase()!=='admin' && username.toLowerCase()!==realName;
+  if(g('u-delete-btn')) g('u-delete-btn').style.display=canDelete?'block':'none';
   om('m-user');
+}
+function deleteUserConfirm(){
+  var username=g('u-id').value;
+  if(!username) return;
+  if(!confirm('Delete user "'+username+'"? This cannot be undone.\n\nTheir attendance/payroll history stays in the sheet but they can no longer log in.')) return;
+  ov('Deleting...');
+  api('deleteUser',{username:username,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:'')}).then(function(r){
+    hov();
+    if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
+    ALL_USERS_CACHE=[];
+    cm('m-user');renderAdmin();
+  });
 }
 function saveUser(){
   var id=g('u-id').value;
@@ -2434,7 +2457,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='1.7';
+var APP_VER='1.8';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -3813,6 +3836,52 @@ function setSidebar(open){
   if(open===SIDEBAR_OPEN) return;
   toggleSidebar();
 }
+
+// ── Pull-to-refresh: drag down from top of scroll area → reload app ──
+(function(){
+  var sa=null, ind=null;
+  var startY=0, pulling=false, dist=0;
+  var TRIGGER=70;   // px to pull before refresh fires
+  var MAX=110;      // cap visual pull
+  function els(){ if(!sa) sa=document.getElementById('scroll-area'); if(!ind) ind=document.getElementById('ptr-indicator'); }
+  document.addEventListener('touchstart', function(e){
+    els(); if(!sa||!ind) return;
+    if(document.querySelector('.mo.on')){ pulling=false; return; }
+    // Only start if scrolled to the very top
+    if(sa.scrollTop<=0){
+      startY=e.touches[0].clientY;
+      pulling=true; dist=0;
+    } else { pulling=false; }
+  }, {passive:true});
+  document.addEventListener('touchmove', function(e){
+    if(!pulling) return;
+    dist=e.touches[0].clientY-startY;
+    if(dist<=0){ // scrolling up, not a pull
+      ind.style.opacity='0'; ind.style.transform='translateX(-50%) translateY(-10px)';
+      return;
+    }
+    var pull=Math.min(dist,MAX);
+    var prog=Math.min(pull/TRIGGER,1);
+    ind.style.opacity=prog;
+    ind.style.transform='translateX(-50%) translateY('+(pull-10)+'px) rotate('+(prog*270)+'deg)';
+  }, {passive:true});
+  document.addEventListener('touchend', function(){
+    if(!pulling) return;
+    pulling=false;
+    if(dist>=TRIGGER){
+      // Trigger refresh
+      ind.classList.add('spinning');
+      ind.style.opacity='1';
+      ind.style.transform='translateX(-50%) translateY(50px)';
+      setTimeout(function(){ window.location.reload(); }, 250);
+    } else {
+      // Snap back
+      ind.style.opacity='0';
+      ind.style.transform='translateX(-50%) translateY(-10px)';
+    }
+    dist=0;
+  }, {passive:true});
+})();
 
 // ── Swipe gesture to open/close sidebar ──
 // Swipe right from near the left edge → open; swipe left anywhere → close.
