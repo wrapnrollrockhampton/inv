@@ -85,9 +85,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 
 /* ── SCROLL AREA ── */
 .scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px 32px;min-width:0}
-#ptr-indicator{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-10px);z-index:900;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
-#ptr-indicator .ptr-spin{width:18px;height:18px;border:2.5px solid #e5e7eb;border-top-color:var(--blue);border-radius:50%}
-#ptr-indicator.spinning .ptr-spin{animation:ptrspin .6s linear infinite}
+#ptr-indicator{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-10px);z-index:900;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
+#ptr-indicator .ptr-pct{font-size:13px;font-weight:800;color:var(--blue)}
+#ptr-indicator.spinning .ptr-pct{display:none}
+#ptr-indicator .ptr-spin{display:none;width:20px;height:20px;border:2.5px solid #e5e7eb;border-top-color:var(--blue);border-radius:50%}
+#ptr-indicator.spinning .ptr-spin{display:block;animation:ptrspin .6s linear infinite}
 @keyframes ptrspin{to{transform:rotate(360deg)}}
 
 /* ── SIDEBAR ── */
@@ -352,7 +354,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 </head>
 <body>
 
-<div id="overlay"><div class="ospin"></div><div id="ot">Loading...</div></div>
+<div id="overlay">
+  <div class="ospin" id="ospin-el"></div>
+  <div class="oprog" id="oprog-el" style="display:none;position:relative;width:64px;height:64px">
+    <svg width="64" height="64" viewBox="0 0 64 64" style="transform:rotate(-90deg)">
+      <circle cx="32" cy="32" r="28" fill="none" stroke="#e5e7eb" stroke-width="5"></circle>
+      <circle id="oprog-ring" cx="32" cy="32" r="28" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round" stroke-dasharray="175.93" stroke-dashoffset="175.93" style="transition:stroke-dashoffset .25s ease"></circle>
+    </svg>
+    <div id="oprog-pct" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:var(--blue)">0%</div>
+  </div>
+  <div id="ot">Loading...</div>
+</div>
 
 <!-- ═══ INSTALL BANNER ═══ -->
 <div id="install-banner">
@@ -407,7 +419,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
   </div>
 
   <div id="app-body">
-    <div id="ptr-indicator"><div class="ptr-spin"></div></div>
+    <div id="ptr-indicator"><span class="ptr-pct">0%</span><span class="ptr-spin"></span></div>
     <div id="sidebar">
       <div id="sidebar-inner">
         <button class="snav-btn active" id="bn-dash" onclick="gp('dash','Dashboard')"><span class="snav-icon">📊</span><span>Dashboard</span></button>
@@ -417,7 +429,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v1.9</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v2.0</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -960,7 +972,28 @@ var scanStream=null,scanRAF=null;
 
 // ════ UTILS ════
 function g(id){return document.getElementById(id)}
-function ov(t){g('ot').textContent=t||'Loading...';g('overlay').classList.add('on')}
+function ov(t){
+  // Generic indeterminate loading (spinner). Used for quick actions.
+  g('ot').textContent=t||'Loading...';
+  if(g('ospin-el')) g('ospin-el').style.display='block';
+  if(g('oprog-el')) g('oprog-el').style.display='none';
+  g('overlay').classList.add('on');
+}
+function ovStart(t){
+  // Percentage loading (used on app open / refresh)
+  g('ot').textContent=t||'Loading...';
+  if(g('ospin-el')) g('ospin-el').style.display='none';
+  if(g('oprog-el')) g('oprog-el').style.display='block';
+  setLoadPct(0);
+  g('overlay').classList.add('on');
+}
+function setLoadPct(pct){
+  pct=Math.max(0,Math.min(100,Math.round(pct)));
+  var ring=g('oprog-ring'), txt=g('oprog-pct');
+  var C=175.93; // 2π·28
+  if(ring) ring.style.strokeDashoffset=String(C*(1-pct/100));
+  if(txt) txt.textContent=pct+'%';
+}
 function hov(){g('overlay').classList.remove('on')}
 function cm(id){g(id).classList.remove('on')}
 function om(id){g(id).classList.add('on')}
@@ -1066,13 +1099,16 @@ function startApp(){
   loadAll();
 }
 function loadAll(){
-  ov('Loading...');
+  ovStart('Loading...');
+  setLoadPct(8);
   api('getInventory').then(function(r1){
     INV=(r1.ok&&r1.data)?r1.data:[];
+    setLoadPct(38);
     api('getTransactions').then(function(r2){
       TX=(r2.ok&&r2.data)?r2.data:[];
+      setLoadPct(64);
       api('getAttendance',{username:(REAL_ADMIN&&REAL_ADMIN.role==='admin')?'':U.username}).then(function(r3){
-        hov();
+        setLoadPct(90);
         ATTENDANCE=(r3.ok&&r3.data)?r3.data.map(function(a){
           return Object.assign({},a,{date:safeDate(a.date)});
         }):[];
@@ -1093,6 +1129,8 @@ function loadAll(){
           renderInv();renderEntry();
           renderStaffDash();
         }
+        setLoadPct(100);
+        setTimeout(hov,150); // brief pause so 100% is visible
         loadOrderSuggestions();
       });
     });
@@ -2346,7 +2384,9 @@ function saveItem(){
 }
 function togglePayrollFields(){
   var role=g('u-role').value;
-  g('u-payroll-fields').style.display=role==='staff'?'block':'none';
+  // Both staff and admin can be paid employees — show rate fields for both.
+  // Only "viewer" (read-only stakeholder) has no payroll.
+  g('u-payroll-fields').style.display=(role==='staff'||role==='admin')?'block':'none';
 }
 function openAddUser(){
   g('m-user-title').textContent='Add User';
@@ -2457,7 +2497,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='1.9';
+var APP_VER='2.0';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -3128,7 +3168,7 @@ function renderPayrollReportTable(){
   // Load users with payroll data
   api('getUsers').then(function(r){
     try {
-    var staffList=(r.ok&&r.data?r.data:[]).filter(function(u){return u.role==='staff'&&u.active==='TRUE';});
+    var staffList=(r.ok&&r.data?r.data:[]).filter(function(u){return (u.role==='staff'||u.role==='admin')&&u.active==='TRUE';});
     if(!staffList.length){stopLoading();wrap.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">No staff found</div>';return;}
 
     // Debug: log ATTENDANCE status
@@ -3856,6 +3896,7 @@ function setSidebar(open){
   document.addEventListener('touchmove', function(e){
     if(!pulling) return;
     dist=e.touches[0].clientY-startY;
+    var pctEl=ind.querySelector('.ptr-pct');
     if(dist<=0){ // scrolling up, not a pull
       ind.style.opacity='0'; ind.style.transform='translateX(-50%) translateY(-10px)';
       return;
@@ -3863,17 +3904,20 @@ function setSidebar(open){
     var pull=Math.min(dist,MAX);
     var prog=Math.min(pull/TRIGGER,1);
     ind.style.opacity=prog;
-    ind.style.transform='translateX(-50%) translateY('+(pull-10)+'px) rotate('+(prog*270)+'deg)';
+    ind.style.transform='translateX(-50%) translateY('+(pull-10)+'px)';
+    if(pctEl) pctEl.textContent=Math.round(prog*100)+'%';
   }, {passive:true});
   document.addEventListener('touchend', function(){
     if(!pulling) return;
     pulling=false;
     if(dist>=TRIGGER){
-      // Trigger refresh
-      ind.classList.add('spinning');
+      // Trigger refresh — show 100% then spinner, then reload
+      var pctEl=ind.querySelector('.ptr-pct');
+      if(pctEl) pctEl.textContent='100%';
       ind.style.opacity='1';
       ind.style.transform='translateX(-50%) translateY(50px)';
-      setTimeout(function(){ window.location.reload(); }, 250);
+      setTimeout(function(){ ind.classList.add('spinning'); }, 150);
+      setTimeout(function(){ window.location.reload(); }, 350);
     } else {
       // Snap back
       ind.style.opacity='0';
