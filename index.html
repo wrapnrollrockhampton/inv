@@ -360,6 +360,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
   <button class="ib-close" onclick="dismissInstallBanner()">✕</button>
 </div>
 
+<!-- ═══ UPDATE BANNER ═══ -->
+<div id="update-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:calc(12px + var(--safe-bottom));background:var(--blue);border-radius:16px;padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:999;align-items:center;gap:12px">
+  <div style="font-size:22px">🎉</div>
+  <div style="flex:1;min-width:0">
+    <div style="font-size:14px;font-weight:700;color:#fff">New version available</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.85)" id="update-banner-sub">Tap to update now</div>
+  </div>
+  <button onclick="applyUpdate()" style="padding:9px 16px;border-radius:10px;border:none;background:#fff;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">Update</button>
+</div>
+
 <!-- ═══ LOGIN ═══ -->
 <div id="login">
   <div class="login-card">
@@ -402,7 +412,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v1.3</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v1.4</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -2277,30 +2287,72 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
   g('install-banner').classList.add('on');
 }
 
-// ════ SERVICE WORKER REGISTRATION ════
+// ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
+// APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
+var APP_VER='1.4';
 var SW_REG=null;
+var UPDATE_PENDING=false;
+
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
-    // updateViaCache:'none' forces browser to always re-fetch sw.js from network
-    // instead of using its own HTTP cache (key fix for slow mobile updates)
     navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(function(reg){
       SW_REG=reg;
-      // Check for update immediately
       reg.update();
-      // Poll for updates every 30 seconds while app is open
-      setInterval(function(){ reg.update().catch(function(){}); }, 30000);
     }).catch(function(){});
   });
-  // Check for update whenever app regains focus (e.g. user reopens from home screen)
-  document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState==='visible' && SW_REG){
-      SW_REG.update().catch(function(){});
-    }
-  });
-  window.addEventListener('focus', function(){
-    if(SW_REG) SW_REG.update().catch(function(){});
-  });
 }
+
+// Active version check — fetch version.json with cache-bust, compare to running APP_VER.
+// This works even when the Service Worker / GitHub CDN is slow to update,
+// because we bypass ALL caches with no-store + a timestamp query param.
+function checkVersion(){
+  fetch('version.json?_='+Date.now(), {cache:'no-store'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data&&data.version&&data.version!==APP_VER&&!UPDATE_PENDING){
+        UPDATE_PENDING=true;
+        // Trigger SW to fetch new files in background
+        if(SW_REG) SW_REG.update().catch(function(){});
+        showUpdateBanner(data.version);
+      }
+    })
+    .catch(function(){});
+}
+
+function showUpdateBanner(newVer){
+  var b=document.getElementById('update-banner');
+  if(b){
+    var sub=document.getElementById('update-banner-sub');
+    if(sub) sub.textContent='v'+APP_VER+' → v'+newVer;
+    b.style.display='flex';
+  }
+}
+
+function applyUpdate(){
+  var sub=document.getElementById('update-banner-sub');
+  if(sub) sub.textContent='Updating...';
+  // Tell waiting SW to activate, then hard reload bypassing cache
+  if(SW_REG&&SW_REG.waiting) SW_REG.waiting.postMessage({type:'SKIP_WAITING'});
+  // Give SW a moment to activate, then reload
+  setTimeout(function(){
+    // Clear caches then reload to guarantee fresh files
+    if('caches' in window){
+      caches.keys().then(function(keys){
+        return Promise.all(keys.map(function(k){return caches.delete(k);}));
+      }).then(function(){ window.location.reload(true); });
+    } else {
+      window.location.reload(true);
+    }
+  }, 400);
+}
+
+// Check on startup, then every 30s, and whenever app regains focus
+window.addEventListener('load', function(){ setTimeout(checkVersion, 2000); });
+setInterval(checkVersion, 30000);
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState==='visible') checkVersion();
+});
+window.addEventListener('focus', checkVersion);
 
 // ════ INIT ════
 // ════════════════════════════════════════
@@ -4160,28 +4212,15 @@ if(!tryRestoreSession()){
   checkApiOnLoad();
 }
 
-// ── Auto-update: reload when Service Worker sends SW_UPDATED ──
+// ── SW lifecycle: activate waiting SW when found ──
 if('serviceWorker' in navigator){
-  var swReloading=false;
-  navigator.serviceWorker.addEventListener('message', function(e){
-    if(e.data&&e.data.type==='SW_UPDATED' && !swReloading){
-      // Don't interrupt if a modal/bottom-sheet is open (user mid-action)
-      var modalOpen=document.querySelector('.mo.on');
-      var ovEl=document.getElementById('overlay');
-      var ovVisible=ovEl&&ovEl.style.display&&ovEl.style.display!=='none';
-      if(!modalOpen&&!ovVisible){
-        swReloading=true;
-        window.location.reload();
-      }
-    }
-  });
-  // Reload once the new SW takes control (controllerchange fires on activation)
+  var swReloaded=false;
+  // When the new SW takes control after applyUpdate(), reload once
   navigator.serviceWorker.addEventListener('controllerchange', function(){
-    if(swReloading) return;
-    var modalOpen=document.querySelector('.mo.on');
-    if(!modalOpen){ swReloading=true; window.location.reload(); }
+    if(swReloaded) return;
+    swReloaded=true;
+    window.location.reload();
   });
-  // Activate waiting SW immediately when found
   navigator.serviceWorker.ready.then(function(reg){
     if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
     reg.addEventListener('updatefound', function(){

@@ -2,7 +2,7 @@
 // Auto-update strategy: SW activates immediately, reloads clients on update
 // Mobile optimisation: index.html & sw.js always fetched network-first,
 // app polls registration.update() every 30s and on focus/visibility change.
-var CACHE_NAME = 'wraproll-v1.3';
+var CACHE_NAME = 'wraproll-v1.4';
 var APP_SHELL = ['./index.html','./manifest.json','./logo.png'];
 
 self.addEventListener('install', function(e){
@@ -47,9 +47,8 @@ self.addEventListener('fetch', function(e){
     return;
   }
 
-  // index.html — network-first so users always get the latest version
-  // Falls back to cache if offline
-  if(url.pathname.endsWith('/') || url.pathname.endsWith('index.html')){
+  // index.html & version.json — network-first so users always get latest
+  if(url.pathname.endsWith('/') || url.pathname.endsWith('index.html') || url.pathname.endsWith('version.json')){
     e.respondWith(
       fetch(e.request).then(function(resp){
         // Update cache with fresh copy
