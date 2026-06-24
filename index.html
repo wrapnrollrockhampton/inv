@@ -491,7 +491,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v3.5</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v3.7</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1616,25 +1616,9 @@ function renderInv(){
     g('inv-list').innerHTML='<div class="empty-state"><div class="emi">🔍</div><p>No items found</p></div>';
     return;
   }
-  // While searching, show a flat list (grouping would get in the way).
-  if(s){
-    g('inv-list').innerHTML=f.map(function(i){return invRowHtml(i,canEditStock);}).join('');
-  } else {
-    // Group by category, collapsible (collapsed by default)
-    var byCat={};
-    f.forEach(function(i){ var c=i.cat||'Other'; (byCat[c]=byCat[c]||[]).push(i); });
-    var cats=Object.keys(byCat).sort(function(a,b){return a.localeCompare(b);});
-    g('inv-list').innerHTML=cats.map(function(cat){
-      var items=byCat[cat];
-      var col=(INV_GROUP_COL[cat]===undefined)?true:INV_GROUP_COL[cat];
-      if(invStFilter) col=false; // when filtering Low/Out, show matches expanded
-      return '<div class="cat-group-h'+(col?' col':'')+'" data-invcat="'+String(cat).replace(/"/g,'&quot;')+'"><span class="ar">▼</span><span class="t">'+catIcon(cat)+' '+cat+'</span><span class="ct">'+items.length+'</span></div>'+
-        '<div class="cat-group-b'+(col?' col':'')+'">'+items.map(function(i){return invRowHtml(i,canEditStock);}).join('')+'</div>';
-    }).join('');
-    g('inv-list').querySelectorAll('.cat-group-h[data-invcat]').forEach(function(h){
-      h.addEventListener('click',function(){var c=h.getAttribute('data-invcat');var prev=(INV_GROUP_COL[c]===undefined)?true:INV_GROUP_COL[c];INV_GROUP_COL[c]=!prev;renderInv();});
-    });
-  }
+  // Flat list, sorted A→Z. Category selection is handled by the filter pills above,
+  // so no collapsible category groups here.
+  g('inv-list').innerHTML=f.map(function(i){return invRowHtml(i,canEditStock);}).join('');
 
   // When there is exactly one result (search), highlight + scroll to it.
   if(f.length===1 && (g('inv-s').value||'').trim()){
@@ -2231,24 +2215,9 @@ function renderOrderSuggestions(){
 
   if(!pending.length){
     g('ord-pending-list').innerHTML='<div class="empty-state"><div class="emi">📋</div><p>No pending suggestions'+(ORD_CAT_FILTER?' in '+ORD_CAT_FILTER:'')+'</p></div>';
-  } else if(ORD_SELECT_MODE){
-    // In select mode, show a flat list so bulk-selecting is easy
-    g('ord-pending-list').innerHTML=pending.map(ordPendingCard).join('');
   } else {
-    // Group by category, collapsible (collapsed by default)
-    var byCat={};
-    pending.forEach(function(o){ var c=o.category||'Other'; (byCat[c]=byCat[c]||[]).push(o); });
-    var cats=Object.keys(byCat).sort(function(a,b){return a.localeCompare(b);});
-    g('ord-pending-list').innerHTML=cats.map(function(cat){
-      var items=byCat[cat];
-      var col=(ORD_GROUP_COL[cat]===undefined)?true:ORD_GROUP_COL[cat];
-      if(ORD_CAT_FILTER) col=false;
-      return '<div class="cat-group-h'+(col?' col':'')+'" data-ordcat="'+String(cat).replace(/"/g,'&quot;')+'"><span class="ar">▼</span><span class="t">'+catIcon(cat)+' '+cat+'</span><span class="ct">'+items.length+'</span></div>'+
-        '<div class="cat-group-b'+(col?' col':'')+'">'+items.map(ordPendingCard).join('')+'</div>';
-    }).join('');
-    g('ord-pending-list').querySelectorAll('.cat-group-h[data-ordcat]').forEach(function(h){
-      h.addEventListener('click',function(){var c=h.getAttribute('data-ordcat');var prev=(ORD_GROUP_COL[c]===undefined)?true:ORD_GROUP_COL[c];ORD_GROUP_COL[c]=!prev;renderOrderSuggestions();});
-    });
+    // Flat list, sorted A→Z. Category selection is handled by the filter pills above.
+    g('ord-pending-list').innerHTML=pending.map(ordPendingCard).join('');
   }
 
   g('ord-resolved-list').innerHTML = resolved.length ? resolved.map(function(o){
@@ -2897,7 +2866,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='3.5';
+var APP_VER='3.7';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
