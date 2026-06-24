@@ -475,6 +475,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
     <div id="ptr-indicator"><span class="ptr-pct">0%</span><span class="ptr-spin"></span></div>
     <div id="sidebar">
       <div id="sidebar-inner">
+        <button class="snav-btn" id="bn-checkin" onclick="gp('checkin','Check In / Out')" style="display:none"><span class="snav-icon">🕐</span><span>Check In / Out</span></button>
         <button class="snav-btn active" id="bn-dash" onclick="gp('dash','Dashboard')"><span class="snav-icon">📊</span><span>Dashboard</span></button>
         <button class="snav-btn" id="bn-inv" onclick="gp('inv','Inventory')"><span class="snav-icon">📦</span><span>Inventory</span></button>
         <button class="snav-btn" id="bn-receive" onclick="gp('receive','Stock-In')" style="display:none"><span class="snav-icon">📥</span><span>Stock-In</span></button>
@@ -483,19 +484,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v3.2</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v3.3</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
 
     <div class="scroll-area" id="scroll-area">
 
-    <!-- ── DASHBOARD ── -->
-    <div class="page on" id="page-dash">
-      <!-- Staff check-in card (hidden for admin, shown for staff/viewer via renderStaffDash) -->
-      <div id="staff-dash-section" style="display:none"></div>
+    <!-- ── CHECK IN / OUT (staff + mod) ── -->
+    <div class="page" id="page-checkin">
+      <div id="staff-dash-section"></div>
+    </div>
 
-      <!-- Admin-only dashboard content: pending, overview, activity, TX history -->
+    <!-- ── DASHBOARD (mod + admin) ── -->
+    <div class="page on" id="page-dash">
+      <!-- Admin/mod dashboard content: pending, overview, activity, TX history -->
       <div id="admin-dash-content" style="display:none">
         <div id="admin-pending-section" style="display:none">
           <div class="sec-hd">
@@ -513,6 +516,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
           <button class="icon-btn" onclick="loadAll()" title="Refresh">🔄</button>
         </div>
         <div class="metric-row metric-row-5" id="d-metrics"></div>
+
+        <!-- Picking pickup box: what to gather for tomorrow -->
+        <div id="dash-picking-box" style="margin-top:14px"></div>
 
         <div class="sec-hd" style="margin-top:20px">
           <span class="sec-title">Activity Summary</span>
@@ -1166,6 +1172,13 @@ function startApp(){
   setAvatar(U);
   updateNavForRole(U.role);
   if(U.role==='admin') loadAccountSwitcher();
+  // Land on the right first page for this role
+  var dp=defaultPageForRole();
+  document.querySelectorAll('.page').forEach(function(el){el.classList.remove('on');});
+  document.querySelectorAll('.snav-btn').forEach(function(b){b.classList.remove('active');});
+  var startPage=g('page-'+dp.id); if(startPage) startPage.classList.add('on');
+  var startBtn=g('bn-'+dp.id); if(startBtn) startBtn.classList.add('active');
+  g('page-title').textContent=dp.title;
   loadAll();
 }
 function loadAll(){
@@ -1183,18 +1196,22 @@ function loadAll(){
           return Object.assign({},a,{date:safeDate(a.date)});
         }):[];
         var isRealAdmin=REAL_ADMIN&&REAL_ADMIN.role==='admin';
-        // Dashboard view follows U.role (the account being viewed),
-        // so admin switching to staff sees the staff dashboard
         var viewAsAdmin = U&&U.role==='admin';
+        var isMod = U&&U.role==='mod';
         var adminContent=g('admin-dash-content');
         var staffSection=g('staff-dash-section');
-        if(adminContent) adminContent.style.display=viewAsAdmin?'block':'none';
-        if(staffSection) staffSection.style.display=viewAsAdmin?'none':'block';
-        // Always render admin-level data (inventory, orders etc) if real admin
+        // Dashboard overview page shows for admin + mod; check-in page content for staff + mod
+        if(adminContent) adminContent.style.display=(viewAsAdmin||isMod)?'block':'none';
+        if(staffSection) staffSection.style.display='block';
+        // Render the right data
         if(isRealAdmin){
           renderInv();renderAna();
           if(viewAsAdmin){renderDash();renderAdmin();renderPayroll();}
           else{renderStaffDash();}
+        } else if(isMod){
+          renderInv();
+          renderDash();        // overview for mod
+          renderStaffDash();   // check-in/pay for mod
         } else {
           renderInv();
           renderStaffDash();
@@ -1208,22 +1225,24 @@ function loadAll(){
 }
 
 // ════ NAV ════
-var PAGE_TITLES={dash:'Dashboard',inv:'Inventory',orders:'Order Suggestions',ana:'Reports',admin:'Admin',payroll:'Payroll',revenue:'Revenue'};
+var PAGE_TITLES={checkin:'Check In / Out',dash:'Dashboard',inv:'Inventory',orders:'Order Suggestions',picking:'Picking',ana:'Reports',admin:'Admin',payroll:'Payroll',revenue:'Revenue'};
 function gp(id,title){
-  // Admin-only pages
-  if((id==='admin'||id==='payroll'||id==='revenue'||id==='receive')){
-    var okAdmin = U && U.role==='admin';
-    var okMod = U && U.role==='mod' && id!=='admin' && modAllowed().indexOf(id)>-1;
+  var role=U?U.role:'';
+  var realAdmin=REAL_ADMIN&&REAL_ADMIN.role==='admin';
+  // Check In/Out: staff + mod only
+  if(id==='checkin' && !(role==='staff'||role==='mod')) return;
+  // Dashboard overview: admin + mod + viewer (not plain staff)
+  if(id==='dash' && role==='staff') return;
+  // Admin-only / elevated pages
+  if((id==='admin'||id==='payroll'||id==='revenue'||id==='receive'||id==='inv'||id==='orders')){
+    var okAdmin = role==='admin' || realAdmin;
+    var okMod = role==='mod' && id!=='admin' && modAllowed().indexOf(id)>-1;
     if(!okAdmin && !okMod) return;
   }
-  // Mod gating for the rest (dash/inv/orders/picking) — only restrict if user is a mod
-  if(U && U.role==='mod'){
-    var allowed=modAllowed();
-    if(allowed.indexOf(id)===-1 && id!=='picking') {
-      // picking allowed for all roles by default; everything else must be granted
-      if(['dash','inv','orders','payroll','revenue','receive'].indexOf(id)>-1) return;
-    }
-    if(id==='picking' && allowed.indexOf('picking')===-1) return;
+  // Picking: admin + granted mod (never staff/viewer)
+  if(id==='picking'){
+    var pkOk = role==='admin' || realAdmin || (role==='mod' && modAllowed().indexOf('picking')>-1);
+    if(!pkOk) return;
   }
   document.querySelectorAll('.page').forEach(function(el){el.classList.remove('on');});
   document.querySelectorAll('.snav-btn').forEach(function(b){b.classList.remove('active');});
@@ -1231,6 +1250,7 @@ function gp(id,title){
   var btn=g('bn-'+id); if(btn) btn.classList.add('active');
   g('page-title').textContent=title||PAGE_TITLES[id]||'';
   g('scroll-area').scrollTop=0;
+  if(id==='checkin') renderStaffDash();
   if(id==='orders') loadOrderSuggestions();
   if(id==='payroll') renderPayroll();
   if(id==='revenue') initRevenuePage();
@@ -1252,6 +1272,51 @@ function renderDash(){
     '<button class="metric-card red" onclick="showDetailModal(\'out\')"><div class="mc-icon">🚫</div><div class="mc-val">'+out.length+'</div><div class="mc-lbl">Out of Stock</div></button>'+
     '<button class="metric-card purple" onclick="showDetailModal(\'orders\')"><div class="mc-icon">📋</div><div class="mc-val">'+pendingOrders.length+'</div><div class="mc-lbl">Order Suggestions</div></button>';
 
+  renderDashPickingBox();
+}
+
+// Aggregate approved pick requests into a "to pick up" list for the admin dashboard
+var PK_PICKUP=[];
+function renderDashPickingBox(){
+  var box=g('dash-picking-box'); if(!box) return;
+  if(!(U&&U.role==='admin')){ box.innerHTML=''; box.style.display='none'; return; }
+  box.style.display='';
+  box.innerHTML='<div class="scard" style="padding:14px;display:flex;align-items:center;gap:12px;opacity:.6"><div style="font-size:24px">🛒</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Picking pickup list</div><div style="font-size:11px;color:var(--text2)">Loading…</div></div></div>';
+  api('getPickRequests').then(function(r){
+    var reqs=(r.ok&&r.data)?r.data:[];
+    PK_REQS=reqs;
+    // consolidate APPROVED requests by item name+unit
+    var agg={};
+    reqs.filter(function(x){return x.status==='Approved';}).forEach(function(req){
+      (req.items||[]).forEach(function(it){
+        var key=(it.cat||'Other')+'|'+it.name+'|'+(it.unit||'');
+        if(!agg[key]) agg[key]={cat:it.cat||'Other',name:it.name,unit:it.unit||'',qty:0};
+        agg[key].qty+=Number(it.qty)||0;
+      });
+    });
+    PK_PICKUP=Object.keys(agg).map(function(k){return agg[k];});
+    var n=PK_PICKUP.length;
+    var pendingN=reqs.filter(function(x){return x.status==='Pending';}).length;
+    box.innerHTML='<button onclick="pkPickupOpen()" style="width:100%;text-align:left;border:1px solid var(--border);background:#fff;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;font-family:inherit">'+
+      '<div style="font-size:24px">🛒</div>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">Picking pickup list</div>'+
+      '<div style="font-size:11px;color:var(--text2)">'+(n?n+' item'+(n===1?'':'s')+' approved to gather':'Nothing approved yet')+(pendingN?' · '+pendingN+' pending':'')+'</div></div>'+
+      '<div style="font-size:20px;font-weight:800;color:var(--blue)">'+n+'</div>'+
+      '<div style="color:var(--text3);font-size:18px">›</div></button>';
+  });
+}
+function pkPickupOpen(){
+  if(!PK_PICKUP.length){ alert('No approved items to pick up yet.'); return; }
+  var cats={}; PK_PICKUP.forEach(function(it){(cats[it.cat]=cats[it.cat]||[]).push(it);});
+  var order=Object.keys(cats).sort(function(a,b){return a==='Other'?1:b==='Other'?-1:(a.localeCompare(b));});
+  var body=order.map(function(cat){
+    var items=cats[cat].sort(function(a,b){return a.name.localeCompare(b.name);});
+    return '<div style="padding:12px 18px 4px;font-size:12px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.05em">'+(CAT_ICO[cat]||'📦')+' '+cat+'</div>'+
+      items.map(function(it){return '<div style="display:flex;justify-content:space-between;padding:7px 18px;font-size:14px;border-bottom:1px solid #f3f4f6"><span>'+escHtmlPk(it.name)+'</span><span style="font-weight:700">'+it.qty+(it.unit?' '+it.unit:'')+'</span></div>';}).join('');
+  }).join('');
+  g('pk-rep-intro').textContent='Consolidated pickup list — '+PK_PICKUP.length+' items from approved requests';
+  g('pk-rep-body').innerHTML=body;
+  g('m-pk-report').classList.add('on');
 }
 
 // --- Detail modal shown when tapping a dashboard metric card ---
@@ -1277,7 +1342,7 @@ function showDetailModal(kind){
     return;
   }
 
-  detailModalItems=items;
+  detailModalItems=(items||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
   detailModalTitle=title;
   detailModalCatFilter='';
   g('m-detail-title').textContent=title+' ('+items.length+')';
@@ -1455,7 +1520,7 @@ function renderInv(){
     if(invCatFilter&&i.cat!==invCatFilter)return false;
     if(invStFilter&&status(i.qty,i.threshold)!==invStFilter)return false;
     return true;
-  });
+  }).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
   if(U&&U.role==='admin'){g('inv-add-btn').innerHTML='<button class="action-btn btn-ghost" onclick="openAddItem()" style="margin-top:4px">+ Add New Item</button>';}
   var canEditStock = U && (U.role==='admin' || U.role==='staff');
   g('inv-list').innerHTML=f.length?f.map(function(i){
@@ -2037,8 +2102,8 @@ function bulkResolveOrders(status){
 function renderOrderSuggestions(){
   var pendingAll=ORDERS.filter(function(o){return o.status==='Pending';});
   var resolvedAll=ORDERS.filter(function(o){return o.status!=='Pending';});
-  var pending=ORD_CAT_FILTER?pendingAll.filter(function(o){return o.category===ORD_CAT_FILTER;}):pendingAll;
-  var resolved=(ORD_CAT_FILTER?resolvedAll.filter(function(o){return o.category===ORD_CAT_FILTER;}):resolvedAll).slice(0,20);
+  var pending=(ORD_CAT_FILTER?pendingAll.filter(function(o){return o.category===ORD_CAT_FILTER;}):pendingAll).slice().sort(function(a,b){return (a.itemName||a.name||'').localeCompare(b.itemName||b.name||'');});
+  var resolved=(ORD_CAT_FILTER?resolvedAll.filter(function(o){return o.category===ORD_CAT_FILTER;}):resolvedAll).slice().sort(function(a,b){return (a.itemName||a.name||'').localeCompare(b.itemName||b.name||'');}).slice(0,20);
   var isAdmin = U && U.role==='admin';
 
   // Show/hide select button based on whether there are pending items
@@ -2343,7 +2408,7 @@ function toggleAdmSection(which){
   if(arr) arr.style.display='inline-block', arr.style.transform=ADM_COLLAPSED[which]?'rotate(-90deg)':'';
 }
 function renderAdmin(){
-  var items = admCatFilter ? INV.filter(function(i){return i.cat===admCatFilter;}) : INV;
+  var items = (admCatFilter ? INV.filter(function(i){return i.cat===admCatFilter;}) : INV.slice()).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
   g('adm-inv-list').innerHTML=items.map(function(i){
     return '<div class="item-row"><div class="item-ico '+(CAT_CLS[i.cat]||'')+'">'+( CAT_ICO[i.cat]||'📦')+'</div>'+
       '<div class="item-info"><div class="item-name">'+i.name+'</div><div class="item-meta"><span>'+i.cat+'</span><span>threshold: '+i.threshold+' '+i.unit+'</span>'+((i.cost&&i.cost>0)?'<span style="color:var(--blue);font-weight:600">$'+Number(i.cost).toFixed(2)+'</span>':'')+'</div></div>'+
@@ -2506,9 +2571,8 @@ function saveItem(){
     });
   }
 }
-// Menus a mod can be granted (Admin portal is never grantable)
+// Menus a mod can be granted (Dashboard is always visible to mods; Admin portal never grantable)
 var MOD_MENUS=[
-  {id:'dash', label:'📊 Dashboard'},
   {id:'inv', label:'📦 Inventory'},
   {id:'receive', label:'📥 Stock-In'},
   {id:'orders', label:'🛒 Order Suggestions'},
@@ -2655,7 +2719,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='3.2';
+var APP_VER='3.3';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4111,32 +4175,44 @@ function modAllowed(){
 function updateNavForRole(role){
   var realAdmin=REAL_ADMIN&&REAL_ADMIN.role==='admin';
   var isMod=role==='mod';
+  var isStaff=role==='staff';
+  var isViewer=role==='viewer';
   var allowed=isMod?modAllowed():[];
-  function show(btnId,menuId,adminOnly){
+
+  // Check In/Out: staff + mod only (admin & viewer don't clock in)
+  if(g('bn-checkin')) g('bn-checkin').style.display=(isStaff||isMod)?'':'none';
+  // Dashboard overview: admin + mod + viewer (NOT plain staff)
+  if(g('bn-dash')) g('bn-dash').style.display=(role==='admin'||realAdmin||isMod||isViewer)?'':'none';
+  // Admin portal: admin only
+  g('bn-admin').style.display = (role==='admin'||realAdmin) ? '' : 'none';
+
+  function showElevated(btnId,menuId){
     var b=g(btnId); if(!b) return;
     var vis = realAdmin || role==='admin';
-    if(isMod && !adminOnly) vis = allowed.indexOf(menuId)>-1;
+    if(isMod) vis = allowed.indexOf(menuId)>-1;
+    if(isStaff||isViewer) vis=false;
     b.style.display = vis ? '' : 'none';
   }
-  // Admin portal: admin only, never mod
-  g('bn-admin').style.display = (role==='admin'||realAdmin) ? '' : 'none';
-  // Elevated menus: admin always; mod if granted
-  show('bn-payroll','payroll',false);
-  show('bn-revenue','revenue',false);
-  show('bn-receive','receive',false);
-  var bp=g('bn-picking'); // picking visible to staff+mod(granted)+admin
+  showElevated('bn-inv','inv');
+  showElevated('bn-receive','receive');
+  showElevated('bn-orders','orders');
+  showElevated('bn-payroll','payroll');
+  showElevated('bn-revenue','revenue');
+  // Picking: admin always; mod if granted; staff/viewer never
+  var bp=g('bn-picking');
   if(bp){
     if(realAdmin||role==='admin') bp.style.display='';
     else if(isMod) bp.style.display=allowed.indexOf('picking')>-1?'':'none';
-    else bp.style.display=''; // staff/viewer can request picking
+    else bp.style.display='none';
   }
-  // For mod, also gate the always-on basic menus (dash/inv/orders) to their grant
-  if(isMod){
-    var bnDash=g('bn-dash'), bnInv=g('bn-inv'), bnOrders=g('bn-orders');
-    if(bnDash) bnDash.style.display=allowed.indexOf('dash')>-1?'':'none';
-    if(bnInv) bnInv.style.display=allowed.indexOf('inv')>-1?'':'none';
-    if(bnOrders) bnOrders.style.display=allowed.indexOf('orders')>-1?'':'none';
-  }
+}
+// Pick the first menu a role should land on after login
+function defaultPageForRole(){
+  var role=U?U.role:'viewer';
+  if(role==='admin'||(REAL_ADMIN&&REAL_ADMIN.role==='admin')) return {id:'dash',title:'Dashboard'};
+  if(role==='staff') return {id:'checkin',title:'Check In / Out'};
+  if(role==='mod') return {id:'checkin',title:'Check In / Out'};
+  return {id:'dash',title:'Dashboard'}; // viewer
 }
 
 // ════ ACCOUNT SWITCHER ════
@@ -5172,15 +5248,34 @@ g('rc-file-pdf').addEventListener('change',function(e){var f=e.target.files[0];i
 // ════════════ PICKING ════════════
 var PK_PICK={}, PK_OTHER=[{name:'',qty:''}], PK_COL={}, PK_REQS=[];
 var CAT_SEQ_PICK=['Meat','Frozen','Beverage','Dry Goods','Other'];
+var PK_ADMIN_MODE='approve'; // 'approve' or 'request' (admin can do both)
 
 function initPickingPage(){
-  // Admins see the approval/report view; staff & mod see the request form.
   var isAdmin = U && U.role==='admin';
-  g('pick-staff-view').style.display = isAdmin ? 'none':'block';
-  g('pick-admin-view').style.display = isAdmin ? 'block':'none';
-  if(isAdmin){ loadPickRequests(); }
-  else { PK_PICK={}; PK_OTHER=[{name:'',qty:''}]; renderPickStaff(); }
+  if(isAdmin){
+    // Admin gets a toggle: Approve (their view) | Request (like a mod)
+    g('pick-staff-view').style.display='none';
+    g('pick-admin-view').style.display='block';
+    renderPickAdminShell();
+  } else {
+    // mod (granted) sees only the request form
+    g('pick-staff-view').style.display='block';
+    g('pick-admin-view').style.display='none';
+    PK_PICK={}; PK_OTHER=[{name:'',qty:''}];
+    renderPickStaff();
+  }
 }
+
+function renderPickAdminShell(){
+  var html='<div style="display:flex;gap:6px;background:#f3f4f6;border-radius:11px;padding:3px;margin-bottom:14px">'+
+    '<button id="pk-tab-approve" onclick="pkSetAdminMode(\'approve\')" style="flex:1;padding:9px;border-radius:9px;border:none;background:'+(PK_ADMIN_MODE==='approve'?'#fff':'transparent')+';font-size:13px;font-weight:700;color:'+(PK_ADMIN_MODE==='approve'?'var(--blue)':'var(--text2)')+';cursor:pointer;font-family:inherit;box-shadow:'+(PK_ADMIN_MODE==='approve'?'0 1px 3px rgba(0,0,0,.1)':'none')+'">✅ Approve / Report</button>'+
+    '<button id="pk-tab-request" onclick="pkSetAdminMode(\'request\')" style="flex:1;padding:9px;border-radius:9px;border:none;background:'+(PK_ADMIN_MODE==='request'?'#fff':'transparent')+';font-size:13px;font-weight:700;color:'+(PK_ADMIN_MODE==='request'?'var(--blue)':'var(--text2)')+';cursor:pointer;font-family:inherit;box-shadow:'+(PK_ADMIN_MODE==='request'?'0 1px 3px rgba(0,0,0,.1)':'none')+'">📝 New Request</button>'+
+    '</div><div id="pk-admin-inner"></div>';
+  g('pick-admin-view').innerHTML=html;
+  if(PK_ADMIN_MODE==='approve'){ loadPickRequests(); }
+  else { PK_PICK={}; PK_OTHER=[{name:'',qty:''}]; renderPickStaff('pk-admin-inner'); }
+}
+function pkSetAdminMode(m){ PK_ADMIN_MODE=m; renderPickAdminShell(); }
 
 function pkTomorrow(){
   var d=new Date(); d.setDate(d.getDate()+1);
@@ -5194,13 +5289,15 @@ function pkCats(){
   return cats;
 }
 
-function renderPickStaff(){
+function renderPickStaff(targetId){
+  var TGT=targetId||'pick-staff-view';
+  function root(){ return g(TGT); }
   var html='<p style="font-size:13px;color:var(--text2);margin:0 0 12px">Pick what you need pulled from storage for tomorrow. Submit when done — it goes to an admin to approve.</p>'+
     '<div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--blue);background:var(--blue-bg);padding:5px 11px;border-radius:8px;margin-bottom:8px">📅 For '+pkTomorrow()+'</div>';
   pkCats().forEach(function(cat){
-    var items=INV.filter(function(i){return (i.cat||'Other')===cat;});
+    var items=INV.filter(function(i){return (i.cat||'Other')===cat;}).sort(function(a,b){return a.name.localeCompare(b.name);});
     if(!items.length) return;
-    var col=PK_COL[cat];
+    var col=(PK_COL[cat]===undefined)?true:PK_COL[cat]; // collapsed by default
     html+='<div class="pk-cath'+(col?' col':'')+'" data-pkcat="'+cat+'"><span class="ar">▼</span><span class="t">'+(CAT_ICO[cat]||'📦')+' '+cat+'</span><span class="ct">'+items.length+'</span></div>';
     html+='<div class="pk-body'+(col?' col':'')+'">';
     html+=items.map(function(it){
@@ -5214,19 +5311,19 @@ function renderPickStaff(){
     }).join('');
     html+='</div>';
   });
-  // Other (collapsible, auto-expanding)
-  var oCol=PK_COL['__other'];
+  // Other (collapsible, auto-expanding) — collapsed by default
+  var oCol=(PK_COL['__other']===undefined)?true:PK_COL['__other'];
   html+='<div class="pk-cath'+(oCol?' col':'')+'" data-pkcat="__other"><span class="ar">▼</span><span class="t" style="color:#7c3aed">✏️ Other</span></div>';
   html+='<div class="pk-body'+(oCol?' col':'')+'"><p style="font-size:11px;color:var(--text3);margin:0 0 8px">Anything not in stock — a new row appears as you type. Filed under "Other".</p><div id="pk-other-rows"></div></div>';
   html+='<div style="margin-top:18px"><button id="pk-submit" style="width:100%;padding:14px;border-radius:13px;border:none;background:var(--blue);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit" disabled>Submit request</button>'+
     '<div id="pk-submit-detail" style="text-align:center;font-size:12px;color:var(--text2);margin-top:8px"></div></div>';
-  g('pick-staff-view').innerHTML=html;
+  root().innerHTML=html;
   renderPkOther();
   // wire
-  g('pick-staff-view').querySelectorAll('.pk-cath[data-pkcat]').forEach(function(h){h.addEventListener('click',function(){var c=h.getAttribute('data-pkcat');PK_COL[c]=!PK_COL[c];renderPickStaff();});});
-  g('pick-staff-view').querySelectorAll('[data-pkinc]').forEach(function(b){b.addEventListener('click',function(){var id=b.getAttribute('data-pkinc');PK_PICK[id]=(PK_PICK[id]||0)+1;renderPickStaff();pkUpdateSubmit();});});
-  g('pick-staff-view').querySelectorAll('[data-pkdec]').forEach(function(b){b.addEventListener('click',function(){var id=b.getAttribute('data-pkdec');PK_PICK[id]=Math.max(0,(PK_PICK[id]||0)-1);renderPickStaff();pkUpdateSubmit();});});
-  g('pick-staff-view').querySelectorAll('[data-pkqty]').forEach(function(inp){inp.addEventListener('input',function(){var id=inp.getAttribute('data-pkqty');var v=parseInt(inp.value);PK_PICK[id]=isNaN(v)?0:Math.max(0,v);pkUpdateSubmit();var bx=inp.closest('.pk-qbox');if(bx)bx.classList.toggle('has',PK_PICK[id]>0);});});
+  root().querySelectorAll('.pk-cath[data-pkcat]').forEach(function(h){h.addEventListener('click',function(){var cc=h.getAttribute('data-pkcat');var prev=(PK_COL[cc]===undefined)?true:PK_COL[cc];PK_COL[cc]=!prev;renderPickStaff(TGT);pkUpdateSubmit();});});
+  root().querySelectorAll('[data-pkinc]').forEach(function(b){b.addEventListener('click',function(){var id=b.getAttribute('data-pkinc');PK_PICK[id]=(PK_PICK[id]||0)+1;renderPickStaff(TGT);pkUpdateSubmit();});});
+  root().querySelectorAll('[data-pkdec]').forEach(function(b){b.addEventListener('click',function(){var id=b.getAttribute('data-pkdec');PK_PICK[id]=Math.max(0,(PK_PICK[id]||0)-1);renderPickStaff(TGT);pkUpdateSubmit();});});
+  root().querySelectorAll('[data-pkqty]').forEach(function(inp){inp.addEventListener('input',function(){var id=inp.getAttribute('data-pkqty');var v=parseInt(inp.value);PK_PICK[id]=isNaN(v)?0:Math.max(0,v);pkUpdateSubmit();var bx=inp.closest('.pk-qbox');if(bx)bx.classList.toggle('has',PK_PICK[id]>0);});});
   var sb=g('pk-submit'); if(sb) sb.addEventListener('click',pkSubmit);
   pkUpdateSubmit();
 }
@@ -5273,14 +5370,16 @@ function pkSubmit(){
     hov();
     if(!r.ok){alert('Could not submit: '+(r.msg||''));return;}
     PK_PICK={};PK_OTHER=[{name:'',qty:''}];
-    renderPickStaff();
-    alert('✓ Picking request submitted to admin');
+    if(U&&U.role==='admin'){ renderPickStaff('pk-admin-inner'); }
+    else { renderPickStaff(); }
+    alert('✓ Picking request submitted');
   });
 }
 
 // ── Admin: approve + report ──
+function pkAdminTarget(){ return g('pk-admin-inner')||g('pick-admin-view'); }
 function loadPickRequests(){
-  g('pick-admin-view').innerHTML='<div style="padding:30px;text-align:center;color:var(--text3)">Loading requests…</div>';
+  pkAdminTarget().innerHTML='<div style="padding:30px;text-align:center;color:var(--text3)">Loading requests…</div>';
   api('getPickRequests').then(function(r){
     PK_REQS=(r.ok&&r.data)?r.data:[];
     renderPickAdmin();
@@ -5296,11 +5395,12 @@ function renderPickAdmin(){
     html+='<div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 10px">Recent</div>';
     html+=done.map(pkReqCard).join('');
   }
-  g('pick-admin-view').innerHTML=html;
-  g('pick-admin-view').querySelectorAll('.pk-reqtop').forEach(function(t){t.addEventListener('click',function(){t.parentElement.querySelector('.pk-reqbody').classList.toggle('on');});});
-  g('pick-admin-view').querySelectorAll('[data-pkapprove]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkApprove(b.getAttribute('data-pkapprove'));});});
-  g('pick-admin-view').querySelectorAll('[data-pkreject]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkReject(b.getAttribute('data-pkreject'));});});
-  g('pick-admin-view').querySelectorAll('[data-pkreport]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkReport(b.getAttribute('data-pkreport'));});});
+  var tgt=pkAdminTarget();
+  tgt.innerHTML=html;
+  tgt.querySelectorAll('.pk-reqtop').forEach(function(t){t.addEventListener('click',function(){t.parentElement.querySelector('.pk-reqbody').classList.toggle('on');});});
+  tgt.querySelectorAll('[data-pkapprove]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkApprove(b.getAttribute('data-pkapprove'));});});
+  tgt.querySelectorAll('[data-pkreject]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkReject(b.getAttribute('data-pkreject'));});});
+  tgt.querySelectorAll('[data-pkreport]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkReport(b.getAttribute('data-pkreport'));});});
 }
 function pkReqTime(iso){ try{ return new Date(iso).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return iso||''; } }
 function pkReqCard(r){
