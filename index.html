@@ -455,12 +455,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
       <div id="sidebar-inner">
         <button class="snav-btn active" id="bn-dash" onclick="gp('dash','Dashboard')"><span class="snav-icon">📊</span><span>Dashboard</span></button>
         <button class="snav-btn" id="bn-inv" onclick="gp('inv','Inventory')"><span class="snav-icon">📦</span><span>Inventory</span></button>
-        <button class="snav-btn" id="bn-receive" onclick="gp('receive','Receive Stock')" style="display:none"><span class="snav-icon">📥</span><span>Receive Stock</span></button>
+        <button class="snav-btn" id="bn-receive" onclick="gp('receive','Stock-In')" style="display:none"><span class="snav-icon">📥</span><span>Stock-In</span></button>
         <button class="snav-btn" id="bn-orders" onclick="gp('orders','Order Suggestions')"><span class="snav-icon">📋</span><span>Orders</span><span class="snav-badge-dot" id="orders-badge">0</span></button>
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v2.7</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v2.8</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -545,8 +545,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
       <div id="rc-results"></div>
       <button id="rc-raw-toggle" style="display:none;margin-top:14px;font-size:12px;color:var(--text3);background:none;border:none;cursor:pointer;font-family:inherit;text-decoration:underline">Show what the scan read ▾</button>
       <div id="rc-raw" style="margin-top:8px;padding:12px;background:#0f172a;color:#94f9c4;font-family:ui-monospace,monospace;font-size:11px;line-height:1.5;border-radius:10px;white-space:pre-wrap;max-height:200px;overflow:auto;display:none"></div>
-      <div id="rc-savebar" style="display:none;margin-top:18px">
-        <button id="rc-save-btn" style="width:100%;padding:15px;border-radius:13px;border:none;background:var(--green);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit" disabled>Save to inventory</button>
+      <div id="rc-savebar" style="display:none;position:sticky;bottom:0;margin:18px -16px 0;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--border);box-shadow:0 -4px 12px rgba(0,0,0,.06)">
+        <button id="rc-save-btn" style="width:100%;padding:15px;border-radius:13px;border:none;background:var(--green);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit" disabled>✓ Update inventory</button>
         <div id="rc-save-detail" style="text-align:center;font-size:12px;color:var(--text2);margin-top:8px"></div>
       </div>
     </div>
@@ -2541,7 +2541,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='2.7';
+var APP_VER='2.8';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4797,9 +4797,9 @@ function rcClassify(text){
     // Match against REAL inventory by supplierSku
     var inv=INV.find(function(it){return String(it.supplierSku||'')===String(code);});
     if(inv){
-      RC_KNOWN.push({id:inv.id, code:code, name:inv.name, unit:inv.unit||'', curQty:inv.qty||0, qty:info.qty, cost:info.cost, pack:info.pack||1, inv:inv});
+      RC_KNOWN.push({id:inv.id, code:code, name:inv.name, unit:inv.unit||'', curQty:inv.qty||0, qty:info.qty, cartons:info.cartons||info.qty, cost:info.cost, pack:info.pack||1, inv:inv});
     } else {
-      RC_NEW.push({code:code, name:info.name||'', qty:info.qty, cost:info.cost, pack:info.pack||1, unit:(RC_SUP==='CCEP'?'CTN':'EA'), added:false});
+      RC_NEW.push({code:code, name:info.name||'', qty:info.qty, cartons:info.cartons||info.qty, cost:info.cost, pack:info.pack||1, unit:(RC_SUP==='CCEP'?'EA':'EA'), added:false});
     }
   }
   rcRender(); rcUpdateBar();
@@ -4809,20 +4809,20 @@ function rcExtractRow(ctx,code,rule){
   var after=ctx.split(code).slice(1).join(code);
   if(rule==='beforePrice'){
     // CCEP: "[vol] [type] X[pack] [name] [cartons] $[total]"
-    // Cost we store = per individual unit = total / (cartons × pack)
+    // qty stored = total individual units (cartons × pack); cost = total / units
     var m=after.match(/(.*?)\b(\d{1,3})\s*\$\s*([\d,]+\.\d{2})/);
     if(m){
       var namepart=m[1];
-      var qty=parseInt(m[2],10);                       // cartons
+      var cartons=parseInt(m[2],10);
       var total=parseFloat(m[3].replace(/,/g,''));
       var packM=namepart.match(/X\s*(\d+)/i);          // pack size e.g. X24
       var pack=packM?parseInt(packM[1],10):1;
-      var units=qty*pack;
-      var cost=units>0?Math.round(total/units*100)/100:null; // per unit (bottle/can)
-      return {qty:qty, cost:cost, pack:pack, name:rcClean(namepart)};
+      var units=cartons*pack;                          // total bottles/cans
+      var cost=units>0?Math.round(total/units*100)/100:null; // per unit
+      return {qty:units, cartons:cartons, pack:pack, cost:cost, name:rcClean(namepart)};
     }
     var m2=after.match(/(.*?)\b([1-9]\d?)\b/);
-    if(m2)return {qty:parseInt(m2[2],10),cost:null,pack:1,name:rcClean(m2[1])};
+    if(m2)return {qty:parseInt(m2[2],10),cartons:parseInt(m2[2],10),pack:1,cost:null,name:rcClean(m2[1])};
     return null;
   }
   if(rule==='shipped'){
@@ -4832,7 +4832,7 @@ function rcExtractRow(ctx,code,rule){
     if(decs&&decs.length>=2)qty=parseFloat(decs[1]);else if(decs&&decs.length===1)qty=parseFloat(decs[0]);
     var pm=after.match(/\$\s*([\d,]+\.\d{2})/);var cost=pm?parseFloat(pm[1].replace(/,/g,'')):null;
     if(qty==null)return null;
-    return {qty:qty, cost:cost, pack:1, name:name};
+    return {qty:qty, cartons:qty, cost:cost, pack:1, name:name};
   }
   return null;
 }
@@ -4863,7 +4863,7 @@ function rcRender(){
         }
       }
       return '<div class="rc-card known"><div class="rc-cinfo"><div class="rc-cname">'+rcEsc(it.name)+'</div>'+
-        '<div class="rc-cid">ID '+it.code+' · in stock: '+it.curQty+'</div>'+costLine+'</div>'+
+        '<div class="rc-cid">ID '+it.code+' · in stock: '+it.curQty+(it.pack&&it.pack>1?' · '+it.cartons+' ctn × '+it.pack:'')+'</div>'+costLine+'</div>'+
         '<div class="rc-qty"><button class="rc-qstep" data-k="'+idx+'" data-act="dec">−</button>'+
         '<input class="rc-qinput" type="number" inputmode="decimal" value="'+it.qty+'" data-k="'+idx+'">'+
         '<button class="rc-qstep" data-k="'+idx+'" data-act="inc">+</button></div><span class="rc-unit">'+it.unit+'</span></div>';
@@ -4873,10 +4873,11 @@ function rcRender(){
   html+='<div class="rc-sec new"><span class="t">✨ New — not in inventory</span><span class="ct">'+RC_NEW.length+'</span></div>';
   if(RC_NEW.length){
     html+=RC_NEW.map(function(it,idx){
-      var costTxt=(it.cost!=null)?(' · $'+it.cost.toFixed(2)+'/unit'+((it.pack&&it.pack>1)?(' ('+it.pack+'/ctn)'):'')):'';
+      var costTxt=(it.cost!=null)?(' · $'+it.cost.toFixed(2)+'/unit'):'';
+      var breakdown=(it.pack&&it.pack>1)?(' ('+it.cartons+' ctn × '+it.pack+')'):'';
       return '<div class="rc-newcard"><div class="rc-newtop"><div style="flex:1;min-width:0">'+
         '<div class="rc-newname'+(it.name?'':' blank')+'">'+(it.name?rcEsc(it.name):'(name not read — add manually)')+'</div>'+
-        '<div class="rc-newmeta">Supplier ID <b>'+it.code+'</b> · qty '+it.qty+costTxt+'</div></div>'+
+        '<div class="rc-newmeta">Supplier ID <b>'+it.code+'</b> · qty '+it.qty+breakdown+costTxt+'</div></div>'+
         '<button class="rc-addbtn'+(it.added?' done':'')+'" data-n="'+idx+'">'+(it.added?'✓ Added':'+ Add')+'</button></div></div>';
     }).join('');
   } else { html+='<div class="rc-none">Every scanned ID already exists 🎉</div>'; }
