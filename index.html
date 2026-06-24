@@ -32,6 +32,37 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 #overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,.92);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:12px}
 #overlay.on{display:flex}
 .ospin{width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite}
+.rc-spin{width:16px;height:16px;border:2.5px solid rgba(37,99,235,.25);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite;flex-shrink:0}
+#rc-status.on{display:flex !important}
+#rc-status.err{background:var(--red-bg) !important;color:var(--red) !important}
+#rc-status.ok{background:var(--green-bg) !important;color:var(--green) !important}
+.rc-sec{display:flex;align-items:center;gap:8px;margin:22px 0 10px}
+.rc-sec .t{font-size:14px;font-weight:800}
+.rc-sec .ct{font-size:11px;font-weight:700;color:#fff;border-radius:20px;padding:2px 9px}
+.rc-sec.known .ct{background:var(--green)}
+.rc-sec.new .ct{background:#7c3aed}
+.rc-card{border:1px solid var(--border);border-radius:13px;padding:12px;margin-bottom:9px;display:flex;align-items:center;gap:10px}
+.rc-card.known{background:var(--green-bg);border-color:#bbf7d0}
+.rc-cinfo{flex:1;min-width:0}
+.rc-cname{font-size:13px;font-weight:700;line-height:1.3}
+.rc-cid{font-size:11px;color:var(--text3);font-family:ui-monospace,monospace;margin-top:1px}
+.rc-ccost{font-size:11px;color:var(--blue);font-weight:600;margin-top:2px}
+.rc-qty{display:flex;align-items:center;border:1.5px solid var(--green);border-radius:10px;overflow:hidden;flex-shrink:0}
+.rc-qstep{width:30px;height:38px;border:none;background:#f3f4f6;font-size:18px;font-weight:700;color:var(--text2);cursor:pointer}
+.rc-qinput{width:48px;height:38px;border:none;text-align:center;font-size:15px;font-weight:700;font-family:inherit;color:var(--text);-moz-appearance:textfield;background:#fff}
+.rc-qinput::-webkit-outer-spin-button,.rc-qinput::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.rc-unit{font-size:10px;color:var(--text3);min-width:26px}
+.rc-newcard{border:1.5px dashed #7c3aed;border-radius:13px;padding:13px;margin-bottom:9px;background:#f5f3ff}
+.rc-newtop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.rc-newname{font-size:13px;font-weight:700}
+.rc-newname.blank{color:var(--text3);font-style:italic;font-weight:500}
+.rc-newmeta{font-size:11px;color:var(--text2);font-family:ui-monospace,monospace;margin-top:2px}
+.rc-newmeta b{color:#7c3aed}
+.rc-addbtn{padding:8px 14px;border-radius:9px;border:none;background:#7c3aed;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0}
+.rc-addbtn.done{background:var(--green)}
+.rc-none{padding:14px;text-align:center;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px}
+.rc-detbanner{display:flex;align-items:center;gap:8px;padding:11px 13px;border-radius:12px;background:#f5f3ff;margin:14px 0 4px;font-size:13px;color:#7c3aed;font-weight:600}
+.rc-detbanner b{font-weight:800}
 #ot{font-size:14px;color:var(--text2);font-weight:500}
 @keyframes sp{to{transform:rotate(360deg)}}
 
@@ -424,11 +455,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
       <div id="sidebar-inner">
         <button class="snav-btn active" id="bn-dash" onclick="gp('dash','Dashboard')"><span class="snav-icon">📊</span><span>Dashboard</span></button>
         <button class="snav-btn" id="bn-inv" onclick="gp('inv','Inventory')"><span class="snav-icon">📦</span><span>Inventory</span></button>
+        <button class="snav-btn" id="bn-receive" onclick="gp('receive','Receive Stock')" style="display:none"><span class="snav-icon">📥</span><span>Receive Stock</span></button>
         <button class="snav-btn" id="bn-orders" onclick="gp('orders','Order Suggestions')"><span class="snav-icon">📋</span><span>Orders</span><span class="snav-badge-dot" id="orders-badge">0</span></button>
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v2.4</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v2.7</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -495,6 +527,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 
       <div class="scard" id="inv-list"></div>
       <div id="inv-add-btn"></div>
+    </div>
+
+    <!-- ── RECEIVE STOCK (scan invoice) ── -->
+    <div class="page" id="page-receive">
+      <p style="font-size:13px;color:var(--text2);margin:0 0 14px">Scan an invoice photo or upload a PDF. The supplier is read automatically. Items already in inventory update stock; any new supplier ID can be added as a product.</p>
+      <input type="file" id="rc-file-photo" accept="image/*" style="display:none">
+      <input type="file" id="rc-file-pdf" accept="application/pdf" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px">
+        <button id="rc-btn-photo" style="padding:18px 12px;border-radius:14px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:22px">📷</span>Scan photo</button>
+        <button id="rc-btn-pdf" style="padding:18px 12px;border-radius:14px;border:none;background:#0f172a;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:22px">📄</span>Upload PDF</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">PDF invoices read most accurately</div>
+      <div id="rc-status" style="margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--blue-bg);font-size:13px;color:var(--blue);display:none;align-items:center;gap:10px"><span class="rc-spin" id="rc-spin"></span><span id="rc-status-text"></span></div>
+      <div id="rc-prog" style="height:6px;border-radius:99px;background:rgba(37,99,235,.15);overflow:hidden;margin-top:8px;display:none"><div id="rc-prog-fill" style="height:100%;background:var(--blue);width:0;transition:width .2s"></div></div>
+      <div id="rc-detected"></div>
+      <div id="rc-results"></div>
+      <button id="rc-raw-toggle" style="display:none;margin-top:14px;font-size:12px;color:var(--text3);background:none;border:none;cursor:pointer;font-family:inherit;text-decoration:underline">Show what the scan read ▾</button>
+      <div id="rc-raw" style="margin-top:8px;padding:12px;background:#0f172a;color:#94f9c4;font-family:ui-monospace,monospace;font-size:11px;line-height:1.5;border-radius:10px;white-space:pre-wrap;max-height:200px;overflow:auto;display:none"></div>
+      <div id="rc-savebar" style="display:none;margin-top:18px">
+        <button id="rc-save-btn" style="width:100%;padding:15px;border-radius:13px;border:none;background:var(--green);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit" disabled>Save to inventory</button>
+        <div id="rc-save-detail" style="text-align:center;font-size:12px;color:var(--text2);margin-top:8px"></div>
+      </div>
     </div>
 
     <!-- ── ORDER SUGGESTIONS ── -->
@@ -802,10 +856,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
           <input type="text" id="i-supplier-name" placeholder="e.g. Bidfood">
         </div>
       </div>
-      <div class="fld">
-        <label id="i-qty-label">Opening Stock</label>
-        <input type="number" id="i-qty" value="0" min="0" inputmode="numeric">
-        <div class="fld-hint" id="i-qty-hint" style="display:none">⚠️ Changing this logs a stock adjustment in transaction history</div>
+      <div class="fld-row">
+        <div class="fld">
+          <label id="i-qty-label">Opening Stock</label>
+          <input type="number" id="i-qty" value="0" min="0" inputmode="numeric">
+          <div class="fld-hint" id="i-qty-hint" style="display:none">⚠️ Changing this logs a stock adjustment in transaction history</div>
+        </div>
+        <div class="fld">
+          <label>Cost / unit ($)</label>
+          <input type="number" id="i-cost" value="0" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
+        </div>
       </div>
       <input type="hidden" id="i-id">
       <div id="i-msg" style="margin-bottom:8px"></div>
@@ -1092,7 +1152,7 @@ function loadAll(){
 // ════ NAV ════
 var PAGE_TITLES={dash:'Dashboard',inv:'Inventory',orders:'Order Suggestions',ana:'Reports',admin:'Admin',payroll:'Payroll',revenue:'Revenue'};
 function gp(id,title){
-  if((id==='admin'||id==='payroll'||id==='revenue') && !(U && U.role==='admin')){
+  if((id==='admin'||id==='payroll'||id==='revenue'||id==='receive') && !(U && U.role==='admin')){
     return;
   }
   document.querySelectorAll('.page').forEach(function(el){el.classList.remove('on');});
@@ -1104,6 +1164,7 @@ function gp(id,title){
   if(id==='orders') loadOrderSuggestions();
   if(id==='payroll') renderPayroll();
   if(id==='revenue') initRevenuePage();
+  if(id==='receive') initReceivePage();
 }
 
 // ════ DASHBOARD ════
@@ -1348,7 +1409,7 @@ function renderInv(){
     }
     return '<div class="item-row"'+rowClick+' id="inv-row-'+i.id+'">'+
       '<div class="item-ico '+(CAT_CLS[i.cat]||'')+'">'+( CAT_ICO[i.cat]||'📦')+'</div>'+
-      '<div class="item-info"><div class="item-name">'+i.name+'</div><div class="item-meta"><span class="status-dot dot-'+st+'"></span>'+skuTag(i.sku)+(i.sku?' · ':'')+'<span style="color:var(--text3)">thresh: '+i.threshold+'</span></div></div>'+
+      '<div class="item-info"><div class="item-name">'+i.name+'</div><div class="item-meta"><span class="status-dot dot-'+st+'"></span>'+skuTag(i.sku)+(i.sku?' · ':'')+'<span style="color:var(--text3)">thresh: '+i.threshold+'</span>'+((i.cost&&i.cost>0)?'<span style="color:var(--blue);font-weight:600">· $'+Number(i.cost).toFixed(2)+'/'+i.unit+'</span>':'')+'</div></div>'+
       '<div class="item-right">'+rightSide+'</div>'+
     '</div>';
   }).join(''):'<div class="empty-state"><div class="emi">🔍</div><p>No items found</p></div>';
@@ -2207,7 +2268,7 @@ function renderAdmin(){
   var items = admCatFilter ? INV.filter(function(i){return i.cat===admCatFilter;}) : INV;
   g('adm-inv-list').innerHTML=items.map(function(i){
     return '<div class="item-row"><div class="item-ico '+(CAT_CLS[i.cat]||'')+'">'+( CAT_ICO[i.cat]||'📦')+'</div>'+
-      '<div class="item-info"><div class="item-name">'+i.name+'</div><div class="item-meta">'+skuTag(i.sku)+(i.sku?' · ':'')+'<span>'+i.cat+'</span><span>threshold: '+i.threshold+' '+i.unit+'</span></div></div>'+
+      '<div class="item-info"><div class="item-name">'+i.name+'</div><div class="item-meta">'+skuTag(i.sku)+(i.sku?' · ':'')+'<span>'+i.cat+'</span><span>threshold: '+i.threshold+' '+i.unit+'</span>'+((i.cost&&i.cost>0)?'<span style="color:var(--blue);font-weight:600">$'+Number(i.cost).toFixed(2)+'</span>':'')+'</div></div>'+
       '<div style="display:flex;gap:6px;flex-shrink:0">'+
         '<button onclick="openEditItem(\''+i.id+'\')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:#f9fafb;font-size:12px;cursor:pointer;font-weight:600">Edit</button>'+
         '<button onclick="duplicateItem(\''+i.id+'\')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--purple-b);background:var(--purple-bg);color:var(--purple);font-size:12px;cursor:pointer;font-weight:600">⧉</button>'+
@@ -2251,7 +2312,7 @@ function openAddItem(){
   g('m-item-title').textContent='Add Item';
   g('i-sku').value='';g('i-name').value='';g('i-unit').value='';
   g('i-qty').value='0';g('i-thr').value='10';g('i-id').value='';
-  g('i-supplier-sku').value='';g('i-supplier-name').value='';
+  g('i-supplier-sku').value='';g('i-supplier-name').value='';g('i-cost').value='0';
   g('i-qty-label').textContent='Opening Stock';
   g('i-qty-hint').style.display='none';
   g('i-msg').innerHTML='';clearSKUPreview();resetSKUPreviewStyle();om('m-item');
@@ -2261,7 +2322,7 @@ function openEditItem(id){
   g('m-item-title').textContent='Edit Item';
   g('i-sku').value=it.sku;g('i-name').value=it.name;g('i-cat').value=it.cat;
   g('i-unit').value=it.unit;g('i-qty').value=it.qty;g('i-thr').value=it.threshold;g('i-id').value=it.id;
-  g('i-supplier-sku').value=it.supplierSku||'';g('i-supplier-name').value=it.supplierName||'';
+  g('i-supplier-sku').value=it.supplierSku||'';g('i-supplier-name').value=it.supplierName||'';g('i-cost').value=it.cost||0;
   g('i-qty-label').textContent='Current Stock';
   g('i-qty-hint').style.display='block';
   g('i-msg').innerHTML='';clearSKUPreview();resetSKUPreviewStyle();om('m-item');
@@ -2274,7 +2335,7 @@ function duplicateItem(id){
   var newSKU=cc+'-'+nc+'-'+(Math.floor(Math.random()*9000)+1000);
   g('i-sku').value=newSKU;g('i-name').value='Copy of '+it.name;g('i-cat').value=it.cat;
   g('i-unit').value=it.unit;g('i-qty').value='0';g('i-thr').value=it.threshold;g('i-id').value='';
-  g('i-supplier-sku').value=it.supplierSku||'';g('i-supplier-name').value=it.supplierName||'';
+  g('i-supplier-sku').value=it.supplierSku||'';g('i-supplier-name').value=it.supplierName||'';g('i-cost').value=it.cost||0;
   g('i-qty-label').textContent='Opening Stock';
   g('i-qty-hint').style.display='none';
   resetSKUPreviewStyle();
@@ -2325,6 +2386,7 @@ function saveItem(){
   var qty=g('i-qty').value,thr=g('i-thr').value,id=g('i-id').value;
   var supplierSku=g('i-supplier-sku').value.trim();
   var supplierName=g('i-supplier-name').value.trim();
+  var cost=parseFloat(g('i-cost').value)||0;
   if(!name||!unit){showMsg('i-msg','err','Please enter item name and unit');return;}
 
   if(id){
@@ -2333,22 +2395,34 @@ function saveItem(){
     if(it){
       it.sku=sku||it.sku; it.name=name; it.cat=cat;
       it.qty=Number(qty); it.unit=unit; it.threshold=Number(thr)||0;
-      it.supplierSku=supplierSku; it.supplierName=supplierName;
+      it.supplierSku=supplierSku; it.supplierName=supplierName; it.cost=cost;
     }
     cm('m-item');
     renderInv(); renderDash();
     updateDashOrdersCount&&updateDashOrdersCount();
     // Persist in background
-    api('updateItem',{itemId:id,sku:sku,name:name,cat:cat,qty:qty,unit:unit,threshold:thr,username:(U?U.username:''),supplierSku:supplierSku,supplierName:supplierName}).then(function(r){
+    api('updateItem',{itemId:id,sku:sku,name:name,cat:cat,qty:qty,unit:unit,threshold:thr,username:(U?U.username:''),supplierSku:supplierSku,supplierName:supplierName,cost:cost}).then(function(r){
       if(!r.ok){ alert('Could not save changes: '+r.msg); loadAll(); }
     });
   } else {
-    // ── ADD new item: need server-generated id, so reload after ──
+    // ── ADD new item: need server-generated id ──
     ov('Saving...');
-    api('addItem',{sku:sku,name:name,cat:cat,qty:qty,unit:unit,threshold:thr,username:(U?U.username:''),supplierSku:supplierSku,supplierName:supplierName}).then(function(r){
+    var fromReceive = g('page-receive') && g('page-receive').classList.contains('on');
+    api('addItem',{sku:sku,name:name,cat:cat,qty:qty,unit:unit,threshold:thr,username:(U?U.username:''),supplierSku:supplierSku,supplierName:supplierName,cost:cost}).then(function(r){
       hov();
       if(!r.ok){showMsg('i-msg','err','❌ '+r.msg);return;}
-      cm('m-item');loadAll();
+      // add to local INV so we don't need a full reload
+      if(r.id){
+        INV.push({id:r.id, sku:(r.sku||sku), name:name, cat:cat, qty:Number(qty)||0, unit:unit, threshold:Number(thr)||0, supplierSku:supplierSku, supplierName:supplierName, cost:cost});
+      }
+      cm('m-item');
+      if(typeof renderInv==='function') renderInv();
+      if(typeof renderDash==='function') renderDash();
+      if(fromReceive && typeof rcMarkAddedByCode==='function' && supplierSku){
+        rcMarkAddedByCode(supplierSku);
+      } else if(!r.id){
+        loadAll(); // fallback only if no id returned
+      }
     });
   }
 }
@@ -2467,7 +2541,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='2.4';
+var APP_VER='2.7';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -3967,6 +4041,7 @@ function updateNavForRole(role){
   g('bn-admin').style.display  = (role==='admin'||realAdmin)  ? '' : 'none';
   g('bn-payroll').style.display= (role==='admin'||realAdmin)  ? '' : 'none';
   g('bn-revenue').style.display= (role==='admin'||realAdmin)  ? '' : 'none';
+  var rcBtn=g('bn-receive'); if(rcBtn) rcBtn.style.display= (role==='admin'||realAdmin) ? '' : 'none';
 }
 
 // ════ ACCOUNT SWITCHER ════
@@ -4595,6 +4670,298 @@ if('serviceWorker' in navigator){
     });
   });
 }
+
+// ════════════ RECEIVE STOCK (invoice scan) ════════════
+var RC_SUP=null, RC_KNOWN=[], RC_NEW=[];
+// Supplier parse rules. Match items by supplierSku against real INV regardless of supplier.
+var RC_RULES={
+  'B&E Foods':{qtyRule:'shipped', codeRe:/\b(\d{4,6}|S\d{1,3})\b/g},
+  'CCEP':{qtyRule:'beforePrice', codeRe:/\b(\d{6})\b/g}
+};
+
+function initReceivePage(){
+  RC_SUP=null; RC_KNOWN=[]; RC_NEW=[];
+  g('rc-detected').innerHTML='';
+  g('rc-results').innerHTML='';
+  g('rc-raw').classList.remove('on'); g('rc-raw').style.display='none';
+  g('rc-raw-toggle').style.display='none';
+  g('rc-status').className=''; g('rc-status').style.display='none';
+  g('rc-savebar').style.display='none';
+}
+
+function rcStatus(t,kind){
+  var s=g('rc-status'); s.className='on'+(kind?(' '+kind):''); s.style.display='flex';
+  g('rc-status-text').textContent=t;
+  g('rc-spin').style.display=kind?'none':'block';
+}
+function rcBusy(on){ g('rc-btn-photo').disabled=on; g('rc-btn-pdf').disabled=on; }
+
+// Photo → Tesseract OCR
+async function rcDoPhoto(file){
+  rcStatus('Reading photo…',null); rcBusy(true);
+  g('rc-prog').style.display='block'; g('rc-prog-fill').style.width='0%';
+  try{
+    if(!window.Tesseract) throw new Error('OCR not loaded');
+    var result=await Tesseract.recognize(file,'eng',{logger:function(m){
+      if(m.status==='recognizing text') g('rc-prog-fill').style.width=Math.round(m.progress*100)+'%';
+      else g('rc-status-text').textContent=m.status.charAt(0).toUpperCase()+m.status.slice(1)+'…';
+    }});
+    g('rc-prog').style.display='none'; rcBusy(false);
+    rcHandleText(result.data.text||'');
+  }catch(err){
+    g('rc-prog').style.display='none'; rcBusy(false);
+    rcStatus('Photo scan failed ('+String(err.message).slice(0,40)+'). Try a PDF or a clearer photo.','err');
+  }
+}
+
+// PDF → pdf.js text extraction (accurate, multi-page)
+async function rcDoPDF(file){
+  if(!window.pdfjsLib){ rcStatus('PDF reader not loaded.','err'); return; }
+  rcStatus('Reading PDF…',null); rcBusy(true);
+  try{
+    var buf=await file.arrayBuffer();
+    var pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    var allText='';
+    for(var p=1;p<=pdf.numPages;p++){
+      rcStatus('Reading PDF page '+p+' of '+pdf.numPages+'…',null);
+      var page=await pdf.getPage(p);
+      var tc=await page.getTextContent();
+      allText+=rcReconstruct(tc.items)+'\n';
+    }
+    rcBusy(false);
+    rcHandleText(allText);
+  }catch(err){
+    rcBusy(false);
+    rcStatus('Could not read PDF ('+String(err.message).slice(0,40)+'). Try the photo option.','err');
+  }
+}
+
+// Rebuild table rows from PDF text items by y-position
+function rcReconstruct(items){
+  var arr=items.map(function(i){return {s:i.str,x:i.transform[4],y:i.transform[5]};}).filter(function(i){return i.s.trim();});
+  arr.sort(function(a,b){return Math.abs(a.y-b.y)>3?b.y-a.y:a.x-b.x;});
+  var lines=[],cur=[],lastY=null;
+  arr.forEach(function(it){
+    if(lastY===null||Math.abs(it.y-lastY)<=3){cur.push(it.s);}
+    else{lines.push(cur.join(' '));cur=[it.s];}
+    lastY=it.y;
+  });
+  if(cur.length)lines.push(cur.join(' '));
+  return lines.join('\n');
+}
+
+function rcHandleText(text){
+  g('rc-raw').textContent=text; g('rc-raw-toggle').style.display='inline';
+  RC_SUP=rcDetectSupplier(text);
+  if(!RC_SUP){
+    g('rc-detected').innerHTML='<div class="rc-detbanner" style="background:var(--red-bg);color:var(--red)">⚠️ Couldn\u2019t recognise the supplier</div>';
+    rcStatus('Supplier not recognised. Make sure the whole invoice is captured.','err');
+    g('rc-results').innerHTML=''; g('rc-savebar').style.display='none';
+    return;
+  }
+  g('rc-detected').innerHTML='<div class="rc-detbanner">📄 Supplier detected: <b>'+RC_SUP+'</b></div>';
+  rcClassify(text);
+  g('rc-savebar').style.display='block';
+  var tot=RC_KNOWN.length+RC_NEW.length;
+  if(tot>0) rcStatus('Found '+tot+' line'+(tot===1?'':'s')+' — '+RC_KNOWN.length+' in inventory, '+RC_NEW.length+' new.','ok');
+  else rcStatus('Supplier read, but no line items matched. Open "what the scan read".','err');
+}
+
+function rcDetectSupplier(text){
+  var t=text.toUpperCase();
+  if(t.indexOf('B&E')>-1||t.indexOf('BEFOODS')>-1||t.indexOf('POULTRY')>-1||t.indexOf('BE FOODS')>-1) return 'B&E Foods';
+  if(t.indexOf('MYCCA')>-1||t.indexOf('CCEP')>-1||t.indexOf('EUROPACIFIC')>-1||t.indexOf('AMATIL')>-1) return 'CCEP';
+  var six=(text.match(/\b9\d{5}\b/g)||[]).length;
+  var fourfive=(text.match(/\b\d{4,5}\b/g)||[]).length;
+  if(six>=3) return 'CCEP';
+  if(fourfive>=3 && six<2) return 'B&E Foods';
+  return null;
+}
+
+function rcClassify(text){
+  var rule=RC_RULES[RC_SUP];
+  if(!rule){ rule={qtyRule:'beforePrice', codeRe:/\b(\d{4,6})\b/g}; } // generic fallback
+  var lines=text.split(/\n/);
+  RC_KNOWN=[]; RC_NEW=[]; var seen={};
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i];
+    rule.codeRe.lastIndex=0;
+    var cm=rule.codeRe.exec(line);
+    if(!cm) continue;
+    var code=cm[1];
+    if(seen[code]) continue;
+    var ctx=line+' '+(lines[i+1]||'');
+    var info=rcExtractRow(ctx,code,rule.qtyRule);
+    if(!info||info.qty==null||info.qty<=0) continue;
+    seen[code]=true;
+    // Match against REAL inventory by supplierSku
+    var inv=INV.find(function(it){return String(it.supplierSku||'')===String(code);});
+    if(inv){
+      RC_KNOWN.push({id:inv.id, code:code, name:inv.name, unit:inv.unit||'', curQty:inv.qty||0, qty:info.qty, cost:info.cost, pack:info.pack||1, inv:inv});
+    } else {
+      RC_NEW.push({code:code, name:info.name||'', qty:info.qty, cost:info.cost, pack:info.pack||1, unit:(RC_SUP==='CCEP'?'CTN':'EA'), added:false});
+    }
+  }
+  rcRender(); rcUpdateBar();
+}
+
+function rcExtractRow(ctx,code,rule){
+  var after=ctx.split(code).slice(1).join(code);
+  if(rule==='beforePrice'){
+    // CCEP: "[vol] [type] X[pack] [name] [cartons] $[total]"
+    // Cost we store = per individual unit = total / (cartons × pack)
+    var m=after.match(/(.*?)\b(\d{1,3})\s*\$\s*([\d,]+\.\d{2})/);
+    if(m){
+      var namepart=m[1];
+      var qty=parseInt(m[2],10);                       // cartons
+      var total=parseFloat(m[3].replace(/,/g,''));
+      var packM=namepart.match(/X\s*(\d+)/i);          // pack size e.g. X24
+      var pack=packM?parseInt(packM[1],10):1;
+      var units=qty*pack;
+      var cost=units>0?Math.round(total/units*100)/100:null; // per unit (bottle/can)
+      return {qty:qty, cost:cost, pack:pack, name:rcClean(namepart)};
+    }
+    var m2=after.match(/(.*?)\b([1-9]\d?)\b/);
+    if(m2)return {qty:parseInt(m2[2],10),cost:null,pack:1,name:rcClean(m2[1])};
+    return null;
+  }
+  if(rule==='shipped'){
+    // B&E: Item Price column is already per unit (per KG/JAR/CTN) → use it directly
+    var nm=after.match(/^(.*?)\d+\.\d{2}/);var name=nm?rcClean(nm[1]):null;
+    var decs=after.match(/\d+\.\d{2}/g);var qty=null;
+    if(decs&&decs.length>=2)qty=parseFloat(decs[1]);else if(decs&&decs.length===1)qty=parseFloat(decs[0]);
+    var pm=after.match(/\$\s*([\d,]+\.\d{2})/);var cost=pm?parseFloat(pm[1].replace(/,/g,'')):null;
+    if(qty==null)return null;
+    return {qty:qty, cost:cost, pack:1, name:name};
+  }
+  return null;
+}
+function rcClean(s){if(!s)return null;s=s.replace(/\s+/g,' ').trim().replace(/^[\-–|:\s]+/,'').replace(/[\-–|:\s]+$/,'');if(s.length<3)return null;return s.length>46?s.slice(0,46):s;}
+function rcEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function rcRender(){
+  if(!RC_SUP){g('rc-results').innerHTML='';return;}
+  var html='<div class="rc-sec known"><span class="t">✓ In inventory</span><span class="ct">'+RC_KNOWN.length+'</span></div>';
+  if(RC_KNOWN.length){
+    html+=RC_KNOWN.map(function(it,idx){
+      var costLine='';
+      var packNote=(it.pack&&it.pack>1)?' <span style="color:var(--text3);font-weight:400">('+it.pack+'/ctn)</span>':'';
+      if(it.cost!=null){
+        var oldCost=Number(it.inv&&it.inv.cost)||0;
+        if(oldCost>0 && Math.abs(it.cost-oldCost)>0.001){
+          var diff=it.cost-oldCost;
+          var pct=Math.round(Math.abs(diff)/oldCost*100);
+          var up=diff>0;
+          costLine='<div class="rc-ccost" style="color:'+(up?'var(--red)':'var(--green)')+'">'+
+            (up?'▲':'▼')+' $'+it.cost.toFixed(2)+'/unit '+
+            '<span style="font-weight:700">('+(up?'+':'−')+'$'+Math.abs(diff).toFixed(2)+', '+pct+'%)</span> '+
+            '<span style="color:var(--text3);font-weight:400">was $'+oldCost.toFixed(2)+'</span>'+packNote+'</div>';
+        } else if(oldCost>0){
+          costLine='<div class="rc-ccost">cost $'+it.cost.toFixed(2)+'/unit (no change)'+packNote+'</div>';
+        } else {
+          costLine='<div class="rc-ccost">cost $'+it.cost.toFixed(2)+'/unit (new)'+packNote+'</div>';
+        }
+      }
+      return '<div class="rc-card known"><div class="rc-cinfo"><div class="rc-cname">'+rcEsc(it.name)+'</div>'+
+        '<div class="rc-cid">ID '+it.code+' · in stock: '+it.curQty+'</div>'+costLine+'</div>'+
+        '<div class="rc-qty"><button class="rc-qstep" data-k="'+idx+'" data-act="dec">−</button>'+
+        '<input class="rc-qinput" type="number" inputmode="decimal" value="'+it.qty+'" data-k="'+idx+'">'+
+        '<button class="rc-qstep" data-k="'+idx+'" data-act="inc">+</button></div><span class="rc-unit">'+it.unit+'</span></div>';
+    }).join('');
+  } else { html+='<div class="rc-none">No matching inventory items</div>'; }
+
+  html+='<div class="rc-sec new"><span class="t">✨ New — not in inventory</span><span class="ct">'+RC_NEW.length+'</span></div>';
+  if(RC_NEW.length){
+    html+=RC_NEW.map(function(it,idx){
+      var costTxt=(it.cost!=null)?(' · $'+it.cost.toFixed(2)+'/unit'+((it.pack&&it.pack>1)?(' ('+it.pack+'/ctn)'):'')):'';
+      return '<div class="rc-newcard"><div class="rc-newtop"><div style="flex:1;min-width:0">'+
+        '<div class="rc-newname'+(it.name?'':' blank')+'">'+(it.name?rcEsc(it.name):'(name not read — add manually)')+'</div>'+
+        '<div class="rc-newmeta">Supplier ID <b>'+it.code+'</b> · qty '+it.qty+costTxt+'</div></div>'+
+        '<button class="rc-addbtn'+(it.added?' done':'')+'" data-n="'+idx+'">'+(it.added?'✓ Added':'+ Add')+'</button></div></div>';
+    }).join('');
+  } else { html+='<div class="rc-none">Every scanned ID already exists 🎉</div>'; }
+  g('rc-results').innerHTML=html;
+
+  g('rc-results').querySelectorAll('.rc-qstep').forEach(function(b){b.addEventListener('click',function(){var i=+b.getAttribute('data-k'),a=b.getAttribute('data-act');RC_KNOWN[i].qty=a==='inc'?RC_KNOWN[i].qty+1:Math.max(0,RC_KNOWN[i].qty-1);rcRender();rcUpdateBar();});});
+  g('rc-results').querySelectorAll('.rc-qinput').forEach(function(inp){inp.addEventListener('input',function(){var i=+inp.getAttribute('data-k');var v=parseFloat(inp.value);RC_KNOWN[i].qty=isNaN(v)?0:v;rcUpdateBar();});});
+  g('rc-results').querySelectorAll('.rc-addbtn').forEach(function(b){b.addEventListener('click',function(){rcOpenAdd(+b.getAttribute('data-n'));});});
+}
+
+function rcUpdateBar(){
+  var k=RC_KNOWN.filter(function(x){return x.qty>0;}).length;
+  var n=RC_NEW.filter(function(x){return x.added;}).length;
+  g('rc-save-detail').textContent=(k+n)?(k+' stock update'+(k===1?'':'s')+(n?', '+n+' new product'+(n===1?'':'s'):'')):'Nothing to save yet';
+  g('rc-save-btn').disabled=(k+n)===0;
+}
+
+// New item → reuse the existing Add Item modal, pre-filled
+var RC_ADD_IDX=-1;
+function rcOpenAdd(idx){
+  RC_ADD_IDX=idx; var it=RC_NEW[idx];
+  if(typeof openAddItem==='function') openAddItem();
+  // pre-fill the standard add-item form
+  setTimeout(function(){
+    if(g('i-name')) g('i-name').value=it.name||'';
+    if(g('i-supplier-sku')) g('i-supplier-sku').value=it.code;
+    if(g('i-supplier-name')) g('i-supplier-name').value=RC_SUP;
+    if(g('i-qty')) g('i-qty').value=it.qty||'';
+    if(g('i-unit')) g('i-unit').value=it.unit||'CTN';
+    if(g('i-cost')) g('i-cost').value=(it.cost!=null?it.cost:'');
+    if(g('i-cat')) g('i-cat').value=(RC_SUP==='CCEP')?'Beverage':(g('i-cat').options.length?g('i-cat').value:'');
+  },30);
+  // mark as added once the user saves via the normal flow; also offer a quick local mark
+  it._pending=true;
+}
+
+// After the normal Add Item save succeeds while on receive page, mark the row added.
+// We hook by checking pending flag after inventory reloads via a light poll.
+function rcMarkAddedByCode(code){
+  var it=RC_NEW.find(function(x){return x.code===code;});
+  if(it){ it.added=true; rcRender(); rcUpdateBar(); }
+}
+
+g('rc-raw-toggle').addEventListener('click',function(){var b=g('rc-raw');var on=b.style.display==='none';b.style.display=on?'block':'none';this.textContent=on?'Hide what the scan read ▴':'Show what the scan read ▾';});
+
+// Save → update real inventory (optimistic, no full reload)
+g('rc-save-btn').addEventListener('click',function(){
+  var ups=RC_KNOWN.filter(function(x){return x.qty>0;});
+  if(!ups.length){ alert('No stock updates to save'); return; }
+  if(!confirm('Add received quantities to stock for '+ups.length+' item'+(ups.length===1?'':'s')+'?')) return;
+  ov('Saving '+ups.length+'…');
+  var done=0;
+  ups.forEach(function(it){
+    var newQty=(parseFloat(it.curQty)||0)+(parseFloat(it.qty)||0);
+    // optimistic local update
+    var invItem=INV.find(function(x){return x.id===it.id;});
+    if(invItem){
+      invItem.qty=newQty;
+      if(it.cost!=null) invItem.cost=it.cost; // store cost if your sheet has it
+    }
+    api('updateItem',{itemId:it.id, sku:(invItem?invItem.sku:''), name:(invItem?invItem.name:it.name), cat:(invItem?invItem.cat:''), qty:newQty, unit:(invItem?invItem.unit:it.unit), threshold:(invItem?invItem.threshold:0), username:(U?U.username:''), supplierSku:it.code, supplierName:RC_SUP}).then(function(){
+      done++;
+      if(done===ups.length){
+        hov();
+        if(typeof renderInv==='function') renderInv();
+        if(typeof renderDash==='function') renderDash();
+        rcStatus('Saved '+ups.length+' stock update'+(ups.length===1?'':'s')+' ✓','ok');
+        // reset received quantities so they aren't double-applied
+        RC_KNOWN.forEach(function(x){x.qty=0; x.curQty=(INV.find(function(y){return y.id===x.id;})||{}).qty||x.curQty;});
+        rcRender(); rcUpdateBar();
+      }
+    });
+  });
+});
+
+g('rc-btn-photo').addEventListener('click',function(){g('rc-file-photo').click();});
+g('rc-btn-pdf').addEventListener('click',function(){g('rc-file-pdf').click();});
+g('rc-file-photo').addEventListener('change',function(e){var f=e.target.files[0];if(f)rcDoPhoto(f);e.target.value='';});
+g('rc-file-pdf').addEventListener('change',function(e){var f=e.target.files[0];if(f)rcDoPDF(f);e.target.value='';});
+</script>
+<!-- Invoice scanning libs (loaded lazily; only used on Receive Stock page) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 </script>
 </body>
 </html>
