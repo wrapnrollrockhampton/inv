@@ -63,6 +63,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 .rc-none{padding:14px;text-align:center;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px}
 .rc-detbanner{display:flex;align-items:center;gap:8px;padding:11px 13px;border-radius:12px;background:#f5f3ff;margin:14px 0 4px;font-size:13px;color:#7c3aed;font-weight:600}
 .rc-detbanner b{font-weight:800}
+.adm-arrow{display:inline-block;font-size:11px;color:var(--text3);transition:transform .15s;margin-right:4px}
 #ot{font-size:14px;color:var(--text2);font-weight:500}
 @keyframes sp{to{transform:rotate(360deg)}}
 
@@ -460,7 +461,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v2.9</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v3.0</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -773,23 +774,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 
     <!-- ── ADMIN ── -->
     <div class="page" id="page-admin">
-      <div class="sec-hd">
-        <span class="sec-title">User Accounts</span>
-        <button onclick="openAddUser()" style="padding:8px 14px;border-radius:10px;background:var(--blue);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
+      <div class="sec-hd" style="cursor:pointer" onclick="toggleAdmSection('users')">
+        <span class="sec-title"><span class="adm-arrow" id="adm-arrow-users">▼</span> User Accounts</span>
+        <button onclick="event.stopPropagation();openAddUser()" style="padding:8px 14px;border-radius:10px;background:var(--blue);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
       </div>
-      <div class="scard" id="adm-usr-list"></div>
+      <div id="adm-sec-users">
+        <div class="scard" id="adm-usr-list"></div>
+      </div>
 
-      <div class="sec-hd" style="margin-top:20px">
-        <span class="sec-title">Product Catalog</span>
-        <button onclick="openAddItem()" style="padding:8px 14px;border-radius:10px;background:var(--blue);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
+      <div class="sec-hd" style="margin-top:20px;cursor:pointer" onclick="toggleAdmSection('items')">
+        <span class="sec-title"><span class="adm-arrow" id="adm-arrow-items">▼</span> Product Catalog</span>
+        <button onclick="event.stopPropagation();openAddItem()" style="padding:8px 14px;border-radius:10px;background:var(--blue);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer">+ Add</button>
       </div>
-      <div class="filter-pills" id="adm-pills">
-        <button class="pill active" onclick="setAdmFilter('',this)">All</button>
-        <button class="pill" onclick="setAdmFilter('Dry Goods',this)">🌾 Dry</button>
-        <button class="pill" onclick="setAdmFilter('Frozen',this)">❄️ Frozen</button>
-        <button class="pill" onclick="setAdmFilter('Beverage',this)">🥤 Beverage</button>
+      <div id="adm-sec-items">
+        <div class="filter-pills" id="adm-pills">
+          <button class="pill active" onclick="setAdmFilter('',this)">All</button>
+          <button class="pill" onclick="setAdmFilter('Dry Goods',this)">🌾 Dry</button>
+          <button class="pill" onclick="setAdmFilter('Frozen',this)">❄️ Frozen</button>
+          <button class="pill" onclick="setAdmFilter('Beverage',this)">🥤 Beverage</button>
+          <button class="pill" onclick="setAdmFilter('Meat',this)">🥩 Meat</button>
+        </div>
+        <div class="scard" id="adm-inv-list"></div>
       </div>
-      <div class="scard" id="adm-inv-list"></div>
     </div>
 
   </div><!-- end scroll-area -->
@@ -2264,11 +2270,18 @@ function setAdmFilter(cat,el){
   el.classList.add('active');
   renderAdmin();
 }
+var ADM_COLLAPSED={};
+function toggleAdmSection(which){
+  ADM_COLLAPSED[which]=!ADM_COLLAPSED[which];
+  var sec=g('adm-sec-'+which), arr=g('adm-arrow-'+which);
+  if(sec) sec.style.display=ADM_COLLAPSED[which]?'none':'';
+  if(arr) arr.style.display='inline-block', arr.style.transform=ADM_COLLAPSED[which]?'rotate(-90deg)':'';
+}
 function renderAdmin(){
   var items = admCatFilter ? INV.filter(function(i){return i.cat===admCatFilter;}) : INV;
   g('adm-inv-list').innerHTML=items.map(function(i){
     return '<div class="item-row"><div class="item-ico '+(CAT_CLS[i.cat]||'')+'">'+( CAT_ICO[i.cat]||'📦')+'</div>'+
-      '<div class="item-info"><div class="item-name">'+i.name+'</div><div class="item-meta">'+skuTag(i.sku)+(i.sku?' · ':'')+'<span>'+i.cat+'</span><span>threshold: '+i.threshold+' '+i.unit+'</span>'+((i.cost&&i.cost>0)?'<span style="color:var(--blue);font-weight:600">$'+Number(i.cost).toFixed(2)+'</span>':'')+'</div></div>'+
+      '<div class="item-info"><div class="item-name">'+i.name+'</div><div class="item-meta"><span>'+i.cat+'</span><span>threshold: '+i.threshold+' '+i.unit+'</span>'+((i.cost&&i.cost>0)?'<span style="color:var(--blue);font-weight:600">$'+Number(i.cost).toFixed(2)+'</span>':'')+'</div></div>'+
       '<div style="display:flex;gap:6px;flex-shrink:0">'+
         '<button onclick="openEditItem(\''+i.id+'\')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:#f9fafb;font-size:12px;cursor:pointer;font-weight:600">Edit</button>'+
         '<button onclick="duplicateItem(\''+i.id+'\')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--purple-b);background:var(--purple-bg);color:var(--purple);font-size:12px;cursor:pointer;font-weight:600">⧉</button>'+
@@ -2541,7 +2554,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='2.9';
+var APP_VER='3.0';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4222,6 +4235,7 @@ function getRevDates(){
   return {from:localDateStr(mon), to:localDateStr(sun)};
 }
 
+var REV_PREV=null;
 function loadRevenue(){
   updateRevWeekLabel();
   var dates=getRevDates();
@@ -4229,12 +4243,23 @@ function loadRevenue(){
   loadOneOffExpenses();
   loadCashActual();
   ov('Loading Square data...');
+  // Previous period (7 days earlier) for week-over-week comparison
+  var prevFrom=shiftDateStr(dates.from,-7), prevTo=shiftDateStr(dates.to,-7);
   api('getSquareSales',{dateFrom:dates.from,dateTo:dates.to}).then(function(r){
-    hov();
-    if(!r.ok){ alert('Square error: '+r.msg); return; }
+    if(!r.ok){ hov(); alert('Square error: '+r.msg); return; }
     REV_DATA=r;
-    renderRevenuePage();
+    // fetch previous period (best-effort; don't block if it fails)
+    api('getSquareSales',{dateFrom:prevFrom,dateTo:prevTo}).then(function(rp){
+      REV_PREV=(rp&&rp.ok)?rp:null;
+      hov();
+      renderRevenuePage();
+    }).catch(function(){ REV_PREV=null; hov(); renderRevenuePage(); });
   });
+}
+// Shift a YYYY-MM-DD date string by N days
+function shiftDateStr(ds,days){
+  var d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+days);
+  return localDateStr(d);
 }
 
 function initRevenuePage(){
@@ -4280,11 +4305,22 @@ function renderRevenuePage(){
   var maxTotal=Math.max.apply(null,days.map(function(d){return d.total;}));
   var DAY={0:'Sun',1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat'};
 
+  // Build a lookup of previous-week daily totals keyed by same weekday offset (date - 7 days)
+  var prevByDate={};
+  if(REV_PREV&&REV_PREV.days){ REV_PREV.days.forEach(function(pd){ prevByDate[pd.date]=pd; }); }
   g('rev-days').innerHTML=days.map(function(d,idx){
     var dt=safeNewDate(d.date);
     var pct=maxTotal>0?Math.round(d.total/maxTotal*100):0;
     var dn=DAY[dt.getDay()]||'';
     var actual=REV_CASH_ACTUAL[d.date]||'';
+    // week-over-week vs same weekday last week
+    var wowHtml='';
+    var prevD=prevByDate[shiftDateStr(d.date,-7)];
+    if(prevD && prevD.total>0){
+      var wd=Math.round((d.total-prevD.total)/prevD.total*100);
+      var wcol=wd>=0?'var(--green)':'var(--red)';
+      wowHtml=' <span style="font-size:10px;color:'+wcol+';font-weight:700">'+(wd>=0?'+':'')+wd+'%</span>';
+    }
     var diffHtml='';
     if(actual!==''){
       var av=parseFloat(actual)*100;
@@ -4304,7 +4340,7 @@ function renderRevenuePage(){
         '<div style="flex:1;min-width:0">'+
           '<div style="display:flex;justify-content:space-between;margin-bottom:3px">'+
             '<span style="font-size:12px;color:var(--text2)">'+d.txn+' sales</span>'+
-            '<span style="font-size:13px;font-weight:700;color:var(--green)">'+fmtRevAUD(d.total)+'</span>'+
+            '<span style="font-size:13px;font-weight:700;color:var(--green)">'+fmtRevAUD(d.total)+wowHtml+'</span>'+
           '</div>'+
           '<div style="height:4px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:3px">'+
             '<div style="height:100%;background:var(--blue);border-radius:3px;width:'+pct+'%"></div>'+
@@ -4502,6 +4538,24 @@ function renderRevPnL(){
   var profit=netActual-payroll-expenses;
   var margin=netActual>0?Math.round(Math.abs(profit)/netActual*100):0;
 
+  // Week-over-week net profit comparison (best-effort)
+  var wowProfitHtml='';
+  if(REV_PREV&&REV_PREV.days){
+    var ps=REV_PREV.summary||{}, pdays=REV_PREV.days||[];
+    var pCashActual=pdays.reduce(function(sum,d){
+      var entered=REV_CASH_ACTUAL[d.date];
+      return sum+(entered!==undefined&&entered!==''?Math.round(parseFloat(entered)*100):d.cash);
+    },0);
+    var pNetActual=(ps.total||0)-(ps.cash||0)+pCashActual;
+    // previous week payroll/expenses aren't readily available; compare on net sales-based profit proxy
+    var pProfit=pNetActual-payroll-expenses;
+    if(Math.abs(pProfit)>0){
+      var wd=Math.round((profit-pProfit)/Math.abs(pProfit)*100);
+      var wcol=wd>=0?'var(--green)':'var(--red)';
+      wowProfitHtml='<div style="font-size:11px;font-weight:700;color:'+wcol+'">'+(wd>=0?'+':'')+wd+'% vs last week</div>';
+    }
+  }
+
   function row(lbl,val,col){
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border)">'+
       '<span style="font-size:12px;color:var(--text2)">'+lbl+'</span>'+
@@ -4524,6 +4578,7 @@ function renderRevPnL(){
           (profit<0?'-':'')+fmtRevAUD(Math.abs(profit))+
         '</div>'+
         '<div style="font-size:11px;color:var(--text2)">margin '+margin+'%'+(profit<0?' (loss)':'')+'</div>'+
+        wowProfitHtml+
       '</div>'+
     '</div>';
 }
