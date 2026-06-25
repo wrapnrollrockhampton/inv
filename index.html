@@ -145,7 +145,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 .top-user-name{font-size:13px;font-weight:500}
 .rtag{padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600}
 .r-admin{background:var(--blue-bg);color:var(--blue)}
-.r-staff{background:var(--green-bg);color:var(--green)}
+.r-mod{background:var(--green-bg);color:var(--green)}
+.r-staff{background:var(--amber-bg);color:var(--amber)}
 .r-viewer{background:#f3f4f6;color:var(--text2)}
 .icon-btn{width:36px;height:36px;border-radius:10px;border:none;background:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px}
 .icon-btn:active{opacity:.7}
@@ -494,7 +495,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Password</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v4.1</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v4.2</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1089,8 +1090,8 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbw0FYCqVlp7di6cdfIJsV9jj0
 // ════ STATE ════
 var U=null,INV=[],TX=[],ATTENDANCE=[];
 var TX_TYPE='Stock In';
-var RL={admin:'Admin',staff:'Staff',viewer:'Viewer'};
-var RC={admin:'r-admin',staff:'r-staff',viewer:'r-viewer'};
+var RL={admin:'Admin',mod:'Mod',staff:'Staff',viewer:'Viewer'};
+var RC={admin:'r-admin',mod:'r-mod',staff:'r-staff',viewer:'r-viewer'};
 // Categories are loaded from the backend (single source of truth, synced across devices).
 // CATEGORIES = [{name, icon}]; CAT_ICO/CAT_CLS kept as fallbacks for colour classes.
 var CATEGORIES=[];
@@ -2915,7 +2916,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='4.1';
+var APP_VER='4.2';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4421,16 +4422,18 @@ function loadAccountSwitcher(){
     var sel=g('acct-switcher');
     if(!sel) return;
     var admins =ALL_USERS_CACHE.filter(function(u){return u.role==='admin';});
+    var mods   =ALL_USERS_CACHE.filter(function(u){return u.role==='mod';});
     var staff  =ALL_USERS_CACHE.filter(function(u){return u.role==='staff';});
     var viewers=ALL_USERS_CACHE.filter(function(u){return u.role==='viewer';});
     function makeOpts(list){
       return list.map(function(u){
-        var dot=u.role==='admin'?'🔴':u.role==='staff'?'🔵':'⚪';
+        var dot=u.role==='admin'?'🔵':u.role==='mod'?'🟢':u.role==='staff'?'🟠':'⚪';
         return '<option value="'+u.username+'"'+(u.username===U.username?' selected':'')+'>'+dot+' '+u.fullname+'</option>';
       }).join('');
     }
     var html='';
     if(admins.length)  html+='<optgroup label="── Admin ──">'+makeOpts(admins)+'</optgroup>';
+    if(mods.length)    html+='<optgroup label="── Mod ──">'+makeOpts(mods)+'</optgroup>';
     if(staff.length)   html+='<optgroup label="── Staff ──">'+makeOpts(staff)+'</optgroup>';
     if(viewers.length) html+='<optgroup label="── Viewer ──">'+makeOpts(viewers)+'</optgroup>';
     sel.innerHTML=html;
@@ -4443,6 +4446,7 @@ function switchAccount(username){
   if(!u) return;
   U=Object.assign({},U,{
     username:u.username, fullname:u.fullname, role:u.role,
+    allowedMenus:u.allowedMenus||'',
     hourlyRate:parseFloat(u.hourlyRate)||0,
     satRate:parseFloat(u.satRate)||1,
     sunRate:parseFloat(u.sunRate)||1,
@@ -4453,7 +4457,9 @@ function switchAccount(username){
   var sel=g('acct-switcher');
   if(sel) sel.value=u.username;
   updateNavForRole(U.role);
-  gp('dash','Dashboard');
+  // Land on the page appropriate for the VIEWED role (staff/mod → check-in, others → dashboard)
+  if(U.role==='staff'||U.role==='mod') gp('checkin','Check In / Out');
+  else gp('dash','Dashboard');
   loadAll();
 }
 
