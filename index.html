@@ -491,7 +491,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v3.8</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border);margin-top:auto">v3.9</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -934,7 +934,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
     <div class="mhd"><span class="mtitle" id="m-user-title">Add User</span><button class="mclose" onclick="cm('m-user')">✕</button></div>
     <div class="mbody">
       <input type="hidden" id="u-id">
-      <div class="fld"><label>Username</label><input type="text" id="u-un" placeholder="e.g. john01" autocomplete="off"></div>
+      <div class="fld"><label>Username</label><input type="text" id="u-un" placeholder="e.g. john01" autocomplete="off"><div class="fld-hint" id="u-un-hint" style="display:none">Changing the username updates it across attendance &amp; history too</div></div>
       <div class="fld"><label id="u-pw-label">Password</label><input type="password" id="u-pw" placeholder="Enter password"></div>
       <div class="fld"><label>Full Name</label><input type="text" id="u-ht" placeholder="e.g. John Smith"></div>
       <div class="fld"><label>Role</label>
@@ -2750,6 +2750,7 @@ function openAddUser(){
   g('m-user-title').textContent='Add User';
   g('u-id').value='';g('u-un').value='';g('u-pw').value='';g('u-ht').value='';g('u-role').value='staff';
   g('u-un').disabled=false;
+  if(g('u-un-hint')) g('u-un-hint').style.display='none';
   g('u-pw-label').textContent='Password';
   g('u-rate').value='0';g('u-daily').value='0';g('u-super').value='11.5';g('u-sat').value='1.25';g('u-sun').value='1.5';g('u-ph').value='2.0';
   g('u-msg').innerHTML='';
@@ -2762,7 +2763,8 @@ function openEditUser(username,fullname,role,hourlyRate,satRate,sunRate,phRate,s
   g('m-user-title').textContent='Edit User';
   g('u-id').value=username;
   g('u-un').value=username;
-  g('u-un').disabled=true;
+  g('u-un').disabled=false;
+  if(g('u-un-hint')) g('u-un-hint').style.display='block';
   g('u-ht').value=fullname;
   g('u-role').value=role;
   g('u-pw').value='';
@@ -2821,8 +2823,15 @@ function saveUser(){
   if(!isEdit&&!pw){showMsg('u-msg','err','Password is required for new users');return;}
   ov(isEdit?'Saving...':'Creating...');
   if(isEdit){
-    api('updateUser',{username:id,password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus}).then(function(r){
+    var renaming = un && un!==String(id).toLowerCase();
+    api('updateUser',{username:id,newUsername:(renaming?un:''),password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus}).then(function(r){
       hov();if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
+      // If the admin renamed their own currently-logged-in account, update the local session
+      if(renaming && U && String(U.username).toLowerCase()===String(id).toLowerCase()){
+        U.username=un;
+        if(REAL_ADMIN && String(REAL_ADMIN.username).toLowerCase()===String(id).toLowerCase()) REAL_ADMIN.username=un;
+        try{ localStorage.setItem('wr_session', JSON.stringify(U)); }catch(e){}
+      }
       ALL_USERS_CACHE=[];// force reload on next loadAll
       cm('m-user');renderAdmin();
     });
@@ -2866,7 +2875,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='3.8';
+var APP_VER='3.9';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
