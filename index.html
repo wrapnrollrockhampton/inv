@@ -164,7 +164,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 #sidebar{width:148px;flex-shrink:0;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .22s ease}
 #sidebar.closed{width:0;border-right:none}
 #sidebar-inner{width:148px;padding:10px 8px;display:flex;flex-direction:column;gap:4px;overflow-y:auto}
-.snav-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:none;background:transparent;color:var(--text2);cursor:pointer;font-family:inherit;font-weight:500;font-size:13px;text-align:left;white-space:nowrap;width:100%;position:relative;transition:background .15s}
+.snav-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:none;background:transparent;color:var(--text2);cursor:pointer;font-family:inherit;font-weight:500;font-size:13px;text-align:left;white-space:nowrap;width:100%;position:relative;transition:background .15s;overflow:hidden}
+.snav-btn>span:not(.snav-icon):not(.snav-badge-dot){overflow:hidden;text-overflow:ellipsis;min-width:0}
+.snav-icon{flex-shrink:0}
 .snav-btn.active{background:var(--blue-bg);color:var(--blue);font-weight:700}
 .snav-icon{width:32px;height:32px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;background:#f3f4f6;transition:background .15s}
 .snav-btn.active .snav-icon{background:var(--blue-bg)}
@@ -491,8 +493,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-payroll" onclick="gp('payroll','Payroll')" style="display:none"><span class="snav-icon">🗓</span><span>Payroll</span><span class="snav-badge-dot" id="payroll-badge">0</span></button>
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
-        <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Change Password</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v4.0</div>
+        <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Password</span></button>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v4.1</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -2913,7 +2915,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='4.0';
+var APP_VER='4.1';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
