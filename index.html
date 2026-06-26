@@ -112,12 +112,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 .ib-close{width:26px;height:26px;border-radius:50%;background:#f3f4f6;border:none;font-size:13px;cursor:pointer;flex-shrink:0}
 
 /* ── LOGIN ── */
-#login{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:linear-gradient(160deg,#1e3a8a 0%,#2563eb 50%,#3b82f6 100%);padding-top:calc(24px + var(--safe-top))}
-.login-card{background:#fff;border-radius:24px;padding:28px 24px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-.login-brand{text-align:center;margin-bottom:28px}
-.login-brand img{width:110px;height:110px;border-radius:50%;object-fit:cover;margin:0 auto 12px;display:block;box-shadow:0 8px 24px rgba(0,0,0,.3)}
-.login-brand h1{font-size:21px;font-weight:700;color:#111;line-height:1.25}
-.login-brand p{font-size:13px;color:var(--text2);margin-top:4px}
+#login{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:16px;background:linear-gradient(160deg,#1e3a8a 0%,#2563eb 50%,#3b82f6 100%);padding-top:calc(16px + var(--safe-top));overflow-y:auto}
+.login-card{background:#fff;border-radius:22px;padding:20px 20px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.25);margin:auto}
+.login-brand{text-align:center;margin-bottom:14px}
+.login-brand img{width:56px;height:56px;border-radius:50%;object-fit:cover;margin:0 auto 8px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.login-brand h1{font-size:17px;font-weight:700;color:#111;line-height:1.25}
+.login-brand p{font-size:12px;color:var(--text2);margin-top:3px}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
 .field input{width:100%;padding:14px 16px;border:1.5px solid #e5e7eb;border-radius:14px;font-size:16px;font-family:inherit;color:#111;background:#f9fafb;transition:border .15s}
@@ -134,42 +134,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 .api-status.err{color:#fecaca}
 
 /* ── PINPAD LOGIN ── */
-.lg-step-title{font-size:18px;font-weight:800;text-align:center;color:#111;margin:0 0 12px}
-.lg-search{position:relative;margin-bottom:12px}
-.lg-search input{width:100%;padding:11px 14px 11px 38px;border:1.5px solid #e5e7eb;border-radius:12px;font-size:15px;font-family:inherit;background:#f9fafb;outline:none}
-.lg-search input:focus{border-color:var(--blue);background:#fff}
-.lg-search .ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text3)}
-.lg-userlist{max-height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin:0 -4px;padding:0 4px}
-.lg-urow{display:flex;align-items:center;gap:12px;padding:10px 12px;background:#f9fafb;border:1px solid #eef0f3;border-radius:14px;cursor:pointer;transition:transform .06s,box-shadow .12s}
-.lg-urow:active{transform:scale(.985);box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.lg-av{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;flex-shrink:0}
-.lg-urow .info{flex:1;min-width:0}
-.lg-urow .fn{font-size:15px;font-weight:700;color:#111;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lg-urow .chev{color:var(--text3);font-size:19px}
-.lg-rdot{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:10px;margin-top:2px}
-.lg-empty{text-align:center;color:var(--text3);font-size:14px;padding:24px 0}
-.lg-link{display:block;text-align:center;margin-top:16px;font-size:13px;font-weight:600;color:var(--blue);cursor:pointer;background:none;border:none;width:100%;font-family:inherit}
-
-.lg-pinhead{display:flex;align-items:center;margin-bottom:4px}
-.lg-back{background:none;border:none;font-size:15px;font-weight:600;color:var(--blue);cursor:pointer;padding:4px;font-family:inherit}
-.lg-pinuser{display:flex;flex-direction:column;align-items:center;margin:6px 0 2px}
-.lg-pinuser .lg-av{width:60px;height:60px;font-size:21px;margin-bottom:9px}
-.lg-pinuser .nm{font-size:18px;font-weight:800;color:#111}
-.lg-pinuser .sub{font-size:12px;color:var(--text2);margin-top:2px}
-.lg-dots{display:flex;gap:15px;justify-content:center;margin:16px 0 22px;height:14px}
-.lg-dot{width:13px;height:13px;border-radius:50%;border:1.6px solid var(--text3);transition:all .12s}
+.lg-userselect{width:100%;padding:13px 14px;border:1.5px solid #e5e7eb;border-radius:14px;font-size:15px;font-weight:600;font-family:inherit;color:#111;background:#f9fafb url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>") no-repeat right 14px center;-webkit-appearance:none;appearance:none;outline:none;cursor:pointer}
+.lg-userselect:focus{border-color:var(--blue);background-color:#fff}
+.lg-dots{display:flex;gap:14px;justify-content:center;margin:16px 0 16px;height:13px}
+.lg-dot{width:12px;height:12px;border-radius:50%;border:1.6px solid var(--text3);transition:all .12s}
 .lg-dot.on{background:var(--blue);border-color:var(--blue);transform:scale(1.08)}
 .lg-dots.err .lg-dot{border-color:var(--red)}
 .lg-dots.shake{animation:lgshake .4s}
 @keyframes lgshake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
-.lg-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;max-width:280px;margin:0 auto}
+.lg-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;width:100%;max-width:236px;margin:0 auto}
 .lg-key{aspect-ratio:1;border-radius:50%;border:none;background:rgba(37,99,235,.07);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:inherit;transition:background .1s,transform .06s}
 .lg-key:active{background:rgba(37,99,235,.18);transform:scale(.96)}
-.lg-key .num{font-size:28px;font-weight:500;line-height:1;color:#111}
-.lg-key .ltr{font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--text2);margin-top:2px;height:10px}
-.lg-key.fn{background:transparent;font-size:22px;color:var(--text2)}
+.lg-key .num{font-size:24px;font-weight:500;line-height:1;color:#111}
+.lg-key .ltr{font-size:8px;font-weight:700;letter-spacing:.1em;color:var(--text2);margin-top:2px;height:9px}
+.lg-key.fn{background:transparent;font-size:20px;color:var(--text2)}
 .lg-key.fn:active{background:rgba(37,99,235,.07)}
 .lg-key.ghost{visibility:hidden}
+.lg-link{display:block;text-align:center;margin-top:14px;font-size:13px;font-weight:600;color:var(--blue);cursor:pointer;background:none;border:none;width:100%;font-family:inherit}
 .pin-len-toggle{display:inline-flex;gap:0;background:#f3f4f6;border-radius:10px;padding:3px;margin-bottom:8px}
 .pin-len-btn{border:none;background:transparent;padding:6px 16px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .12s}
 .pin-len-btn.active{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.1)}
@@ -500,24 +481,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
     </div>
     <div id="lmsg"></div>
 
-    <!-- STEP 1: pick user -->
-    <div id="lg-users">
-      <div class="lg-step-title">Who's signing in?</div>
-      <div class="lg-search"><span class="ico">🔍</span><input id="lg-search" type="text" placeholder="Search name…" autocomplete="off"></div>
-      <div class="lg-userlist" id="lg-userlist"><div class="lg-empty">Loading…</div></div>
-      <button class="lg-link" onclick="lgShowManual()">Sign in with username instead</button>
-    </div>
-
-    <!-- STEP 2: pin pad -->
-    <div id="lg-pin" style="display:none">
-      <div class="lg-pinhead"><button class="lg-back" onclick="lgBackToUsers()">‹ Back</button></div>
-      <div class="lg-pinuser">
-        <div class="lg-av" id="lg-pin-av"></div>
-        <div class="nm" id="lg-pin-name"></div>
-        <div class="sub">Enter your passcode</div>
-      </div>
+    <!-- DEFAULT: pick name from dropdown + PIN pad -->
+    <div id="lg-pinmode">
+      <select class="lg-userselect" id="lg-user-select" onchange="lgSelectFromDropdown(this.value)">
+        <option value="">Select your name…</option>
+      </select>
       <div class="lg-dots" id="lg-dots"></div>
       <div class="lg-pad" id="lg-pad"></div>
+      <button class="lg-link" onclick="lgShowManual()">Enter username instead</button>
     </div>
 
     <!-- FALLBACK: manual username + passcode -->
@@ -525,7 +496,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
       <div class="field"><label>Username</label><input id="lu" type="text" placeholder="Enter username" autocomplete="username" inputmode="text"></div>
       <div class="field"><label>Passcode</label><input id="lp" type="password" placeholder="Enter passcode" autocomplete="current-password" inputmode="numeric" pattern="[0-9]*"></div>
       <button class="login-btn" id="login-btn" onclick="doLoginManual()">Sign In →</button>
-      <button class="lg-link" onclick="lgShowUsers()">‹ Back to user list</button>
+      <button class="lg-link" onclick="lgShowPinmode()">‹ Back to name list</button>
     </div>
 
     <div class="api-status" id="api-status"></div>
@@ -562,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.0</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.1</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1297,53 +1268,32 @@ document.addEventListener('keydown',function(e){
 });
 
 // ── Login view switching ──
-function lgShowUsers(){ g('lg-users').style.display=''; g('lg-pin').style.display='none'; g('lg-manual').style.display='none'; g('lmsg').innerHTML=''; }
-function lgShowManual(){ g('lg-users').style.display='none'; g('lg-pin').style.display='none'; g('lg-manual').style.display=''; g('lmsg').innerHTML=''; }
-function lgBackToUsers(){ LG_SEL=null; LG_ENTRY=''; lgShowUsers(); g('lg-search').value=''; renderLgUserList(''); }
+function lgShowPinmode(){ g('lg-pinmode').style.display=''; g('lg-manual').style.display='none'; g('lmsg').innerHTML=''; }
+function lgShowManual(){ g('lg-pinmode').style.display='none'; g('lg-manual').style.display=''; g('lmsg').innerHTML=''; }
 
-// ── Login user list ──
+// ── Login user dropdown ──
 var LG_USERS=[], LG_SEL=null, LG_ENTRY='';
-var LG_COLORS=['#2563eb','#16a34a','#d97706','#7c3aed','#db2777','#0891b2','#ea580c','#4f46e5','#0d9488','#c026d3'];
-function lgColor(un){ var h=0; for(var i=0;i<un.length;i++){h=(h*31+un.charCodeAt(i))>>>0;} return LG_COLORS[h%LG_COLORS.length]; }
-function lgInitials(fn){ var p=String(fn).trim().split(/\s+/); return p.length>1?(p[0][0]+p[p.length-1][0]).toUpperCase():p[0].slice(0,2).toUpperCase(); }
-var LG_RLBL={admin:'Admin',mod:'Mod',staff:'Staff',viewer:'Viewer'};
-var LG_RCOL={admin:{bg:'#eff6ff',c:'#2563eb'},mod:{bg:'#f0fdf4',c:'#16a34a'},staff:{bg:'#fffbeb',c:'#d97706'},viewer:{bg:'#f3f4f6',c:'#6b7280'}};
 
 function loadLoginUsers(){
   api('getLoginUsers').then(function(r){
     LG_USERS=(r.ok&&r.data)?r.data:[];
-    renderLgUserList('');
-  }).catch(function(){ renderLgUserList(''); });
+    populateLgDropdown();
+  }).catch(function(){ populateLgDropdown(); });
 }
-function renderLgUserList(filter){
-  filter=(filter||'').trim().toLowerCase();
-  var box=g('lg-userlist'); if(!box) return;
-  if(!LG_USERS.length){ box.innerHTML='<div class="lg-empty">No users — use "Sign in with username"</div>'; return; }
+function populateLgDropdown(){
+  var sel=g('lg-user-select'); if(!sel) return;
   var list=LG_USERS.slice().sort(function(a,b){return String(a.fullname).localeCompare(String(b.fullname));});
-  if(filter) list=list.filter(function(u){return String(u.fullname).toLowerCase().indexOf(filter)>-1;});
-  if(!list.length){ box.innerHTML='<div class="lg-empty">No user found</div>'; return; }
-  box.innerHTML=list.map(function(u){
-    var rc=LG_RCOL[u.role]||LG_RCOL.viewer;
-    return '<div class="lg-urow" data-u="'+encodeURIComponent(u.username)+'">'+
-      '<div class="lg-av" style="background:'+lgColor(u.username)+'">'+lgInitials(u.fullname)+'</div>'+
-      '<div class="info"><div class="fn">'+u.fullname+'</div>'+
-        '<span class="lg-rdot" style="background:'+rc.bg+';color:'+rc.c+'">'+(LG_RLBL[u.role]||u.role)+'</span></div>'+
-      '<div class="chev">›</div></div>';
-  }).join('');
-  box.querySelectorAll('[data-u]').forEach(function(el){
-    el.addEventListener('click',function(){ lgPickUser(decodeURIComponent(el.getAttribute('data-u'))); });
-  });
+  var opts='<option value="">Select your name…</option>';
+  opts+=list.map(function(u){ return '<option value="'+encodeURIComponent(u.username)+'">'+u.fullname+'</option>'; }).join('');
+  sel.innerHTML=opts;
+  if(!LG_USERS.length){ sel.innerHTML='<option value="">No users — tap "Enter username instead"</option>'; }
+  LG_SEL=null; LG_ENTRY=''; renderLgDots();
 }
 function lgCurLen(){ return LG_SEL?(LG_SEL.pinLen||4):4; }
-function lgPickUser(un){
-  LG_SEL=LG_USERS.find(function(x){return x.username===un;});
-  if(!LG_SEL) return;
-  LG_ENTRY='';
-  g('lg-pin-av').textContent=lgInitials(LG_SEL.fullname);
-  g('lg-pin-av').style.background=lgColor(LG_SEL.username);
-  g('lg-pin-name').textContent=LG_SEL.fullname;
-  renderLgDots();
-  g('lg-users').style.display='none'; g('lg-pin').style.display=''; g('lmsg').innerHTML='';
+function lgSelectFromDropdown(val){
+  var un=val?decodeURIComponent(val):'';
+  LG_SEL=un?LG_USERS.find(function(x){return x.username===un;}):null;
+  LG_ENTRY=''; renderLgDots(); g('lmsg').innerHTML='';
 }
 function renderLgDots(){
   var d=g('lg-dots'); if(!d) return; d.className='lg-dots';
@@ -1365,6 +1315,7 @@ function renderLgPad(){
   });
 }
 function lgOnKey(k){
+  if(!LG_SEL && k!=='del'){ showMsg('lmsg','err','Please select your name first'); return; }
   if(k==='del'){ LG_ENTRY=LG_ENTRY.slice(0,-1); renderLgDots(); return; }
   var n=lgCurLen();
   if(LG_ENTRY.length>=n) return;
@@ -1373,9 +1324,7 @@ function lgOnKey(k){
 }
 function lgSubmitPin(){
   if(!LG_SEL||LG_ENTRY.length!==lgCurLen()) return;
-  var pin=LG_ENTRY;
-  loginWith(LG_SEL.username, pin, function(){
-    // wrong passcode → shake + clear, stay on pad
+  loginWith(LG_SEL.username, LG_ENTRY, function(){
     var d=g('lg-dots'); d.classList.add('err','shake');
     setTimeout(function(){ LG_ENTRY=''; renderLgDots(); }, 450);
   });
@@ -1389,7 +1338,7 @@ function doLogout(){
   g('login').style.display='flex';
   g('lu').value='';g('lp').value='';g('lmsg').innerHTML='';
   LG_SEL=null; LG_ENTRY='';
-  lgShowUsers();
+  lgShowPinmode();
   loadLoginUsers();
 }
 function tryRestoreSession(){
@@ -3093,7 +3042,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='5.0';
+var APP_VER='5.1';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -5247,7 +5196,6 @@ function exportRevenuePDF(){
 
 // Set up the PIN pad login screen (elements persist; safe to run once regardless of session)
 renderLgPad();
-(function(){ var lgs=g('lg-search'); if(lgs) lgs.addEventListener('input', function(e){ renderLgUserList(e.target.value); }); })();
 
 if(!tryRestoreSession()){
   checkApiOnLoad();
