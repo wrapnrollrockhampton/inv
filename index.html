@@ -1283,7 +1283,7 @@ function loadAll(){
     api('getTransactions').then(function(r2){
       TX=(r2.ok&&r2.data)?r2.data:[];
       setLoadPct(64);
-      api('getAttendance',{username:(REAL_ADMIN&&REAL_ADMIN.role==='admin')?'':U.username}).then(function(r3){
+      api('getAttendance',{username:((REAL_ADMIN&&REAL_ADMIN.role==='admin')||(U&&U.role==='mod'))?'':U.username}).then(function(r3){
         setLoadPct(90);
         ATTENDANCE=(r3.ok&&r3.data)?r3.data.map(function(a){
           return Object.assign({},a,{date:safeDate(a.date)});
@@ -3367,7 +3367,9 @@ function submitRequest(){
 
 // ── Admin Payroll ─────────────────────
 function renderPayroll(){
-  if(!REAL_ADMIN||REAL_ADMIN.role!=='admin') return;
+  // Payroll report: admin, or a mod who's been granted the Payroll tab (nav/gp already gate access)
+  var canPayroll = (REAL_ADMIN&&REAL_ADMIN.role==='admin') || (U&&U.role==='admin') || (U&&U.role==='mod');
+  if(!canPayroll) return;
   var pending=ATTENDANCE.filter(function(a){return (!a.status||a.status==='Pending'||a.status==='Requested')&&!!a.checkOut;});
   updatePayrollBadge(pending.length);
 
