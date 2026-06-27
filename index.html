@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.2</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.3</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1088,10 +1088,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
     <div class="mhead"><span class="mtitle">📋 Stocktake Report</span><button class="mclose" onclick="cm('m-stocktake')">✕</button></div>
     <div class="mbody" style="padding-bottom:16px">
       <div class="fld"><label>Stocktake date (as at)</label><input type="date" id="st-date" onchange="renderStocktakePreview()"></div>
-      <div style="display:flex;gap:8px;margin:10px 0 14px">
+      <div class="fld"><label>Send-to email (for Excel report)</label><input type="email" id="st-email" placeholder="accountant@example.com" autocomplete="off" inputmode="email"></div>
+      <div style="display:flex;gap:8px;margin:10px 0 8px">
         <button class="action-btn btn-blue" style="flex:1" onclick="stocktakeExportPDF()">⬇️ PDF</button>
         <button class="action-btn btn-ghost" style="flex:1" onclick="stocktakeExportImage()">🖼️ Image</button>
       </div>
+      <button class="action-btn" style="width:100%;background:#16a34a;color:#fff;margin-bottom:14px" onclick="emailStocktakeClick()">📧 Email Excel report</button>
       <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Preview — trading stock valued at cost (ex GST), for end-of-financial-year stocktake records.</div>
       <div id="st-preview" style="border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:42vh"></div>
     </div>
@@ -2716,8 +2718,21 @@ function deleteCategoryConfirm(){
 function openStocktake(){
   var d=g('st-date');
   if(d && !d.value){ var now=new Date(); d.value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'); }
+  // prefill saved report email
+  api('getReportEmail').then(function(r){ if(r&&r.ok&&r.email&&g('st-email')&&!g('st-email').value) g('st-email').value=r.email; });
   renderStocktakePreview();
   om('m-stocktake');
+}
+function emailStocktakeClick(){
+  var email=(g('st-email')&&g('st-email').value||'').trim();
+  var date=(g('st-date')&&g('st-date').value)||'';
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ alert('Please enter a valid email address'); return; }
+  ov('Sending Excel report...');
+  api('emailStocktakeReport',{date:date, email:email}).then(function(r){
+    hov();
+    if(!r.ok){ alert('Could not send: '+(r.msg||'')); return; }
+    alert('✓ Excel report sent to '+r.sentTo+'\nTotal stock value: $'+Number(r.total||0).toFixed(2));
+  });
 }
 function stFmtDate(s){
   try{ var p=s.split('-'); return new Date(p[0],p[1]-1,p[2]).toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return s; }
@@ -3184,7 +3199,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='5.2';
+var APP_VER='5.3';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
