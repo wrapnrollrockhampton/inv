@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.3</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.4</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1502,18 +1502,21 @@ function renderDash(){
     '<button class="metric-card amber" onclick="showDetailModal(\'low\')"><div class="mc-icon">⚠️</div><div class="mc-val">'+low.length+'</div><div class="mc-lbl">Low Stock</div></button>'+
     '<button class="metric-card red" onclick="showDetailModal(\'out\')"><div class="mc-icon">🚫</div><div class="mc-val">'+out.length+'</div><div class="mc-lbl">Out of Stock</div></button>'+
     '<button class="metric-card purple" onclick="showDetailModal(\'orders\')"><div class="mc-icon">📋</div><div class="mc-val">'+pendingOrders.length+'</div><div class="mc-lbl">Order Suggestions</div></button>'+
-    ((U&&U.role==='admin')?'<button class="metric-card blue" onclick="pkPickupOpen()" id="mc-picking"><div class="mc-icon">🛒</div><div class="mc-val" id="mc-picking-val">—</div><div class="mc-lbl">Picking pickup</div></button>':'');
+    ((U&&U.role==='admin')?'<button class="metric-card blue" onclick="pkPickupOpen()" id="mc-picking"><div class="mc-icon" id="mc-picking-ico">🛒</div><div class="mc-val" id="mc-picking-val">—</div><div class="mc-lbl" id="mc-picking-lbl">Picking</div></button>':'');
 
   renderDashPickingBox();
 }
 
 // Load approved pick requests, consolidate, and update the Picking metric card
 var PK_PICKUP=[];
+var PK_PENDING_CT=0;
 function renderDashPickingBox(){
   if(!(U&&U.role==='admin')) return;
   api('getPickRequests').then(function(r){
     var reqs=(r.ok&&r.data)?r.data:[];
     PK_REQS=reqs;
+    var pending=reqs.filter(function(x){return x.status==='Pending';});
+    PK_PENDING_CT=pending.length;
     var agg={};
     reqs.filter(function(x){return x.status==='Approved';}).forEach(function(req){
       (req.items||[]).forEach(function(it){
@@ -1523,11 +1526,31 @@ function renderDashPickingBox(){
       });
     });
     PK_PICKUP=Object.keys(agg).map(function(k){return agg[k];});
-    var vEl=g('mc-picking-val'); if(vEl) vEl.textContent=PK_PICKUP.length;
+    var vEl=g('mc-picking-val'), lEl=g('mc-picking-lbl'), iEl=g('mc-picking-ico'), bEl=g('mc-picking');
+    if(pending.length>0){
+      // there are requests waiting → tap to approve
+      if(vEl) vEl.textContent=pending.length;
+      if(lEl) lEl.textContent='To approve';
+      if(iEl) iEl.textContent='📥';
+      if(bEl) bEl.style.boxShadow='0 0 0 2px #f59e0b inset';
+    } else {
+      // none pending → tap to view the consolidated pickup list
+      if(vEl) vEl.textContent=PK_PICKUP.length;
+      if(lEl) lEl.textContent='To pick up';
+      if(iEl) iEl.textContent='🛒';
+      if(bEl) bEl.style.boxShadow='';
+    }
+    var badge=g('picking-badge');
+    if(badge){ if(pending.length>0){ badge.textContent=pending.length; badge.style.display=''; } else { badge.style.display='none'; } }
   });
 }
+function pkGotoApprove(){
+  PK_ADMIN_MODE='approve';
+  gp('picking','Picking'); // initPickingPage → approve mode → loadPickRequests (fresh)
+}
 function pkPickupOpen(){
-  if(!PK_PICKUP.length){ alert('No approved items to pick up yet.'); return; }
+  if(PK_PENDING_CT>0){ pkGotoApprove(); return; }   // pending requests → go approve them
+  if(!PK_PICKUP.length){ alert('No pending requests, and nothing approved to pick up yet.'); return; }
   var cats={}; PK_PICKUP.forEach(function(it){(cats[it.cat]=cats[it.cat]||[]).push(it);});
   var order=Object.keys(cats).sort(function(a,b){return a==='Other'?1:b==='Other'?-1:(a.localeCompare(b));});
   var body=order.map(function(cat){
@@ -3199,7 +3222,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='5.3';
+var APP_VER='5.4';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -5929,7 +5952,7 @@ function renderPickAdmin(){
   var pending=PK_REQS.filter(function(r){return r.status==='Pending';});
   var done=PK_REQS.filter(function(r){return r.status!=='Pending';}).slice(-10).reverse();
   var html='<p style="font-size:13px;color:var(--text2);margin:0 0 12px">Review picking requests. Approving deducts the picked items from stock and lets you export a report.</p>';
-  html+='<div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:6px 0 10px">Pending ('+pending.length+')</div>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 10px"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Pending ('+pending.length+')</div><button onclick="loadPickRequests()" style="font-size:12px;font-weight:700;color:var(--blue);background:var(--blue-bg);border:none;border-radius:8px;padding:5px 11px;cursor:pointer;font-family:inherit">🔄 Refresh</button></div>';
   html+= pending.length ? pending.map(pkReqCard).join('') : '<div style="padding:30px;text-align:center;color:var(--text3)">✅ No pending requests</div>';
   if(done.length){
     html+='<div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 10px">Recent</div>';
