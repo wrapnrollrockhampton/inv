@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.1</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.2</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -598,6 +598,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="pill" onclick="setInvFilter('cat','Beverage',this)">🥤 Beverage</button>
         <button class="pill" onclick="setInvFilter('st','low',this)">⚠️ Low</button>
         <button class="pill" onclick="setInvFilter('st','out',this)">🚫 Out</button>
+      </div>
+
+      <div id="inv-stocktake-btn" style="display:none;margin-bottom:12px">
+        <button onclick="openStocktake()" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--blue-b);background:var(--blue-bg);color:var(--blue);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">📋 Stocktake Report (for EOFY / accountant)</button>
       </div>
 
       <div class="scard" id="inv-list"></div>
@@ -1077,6 +1081,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
   </div>
 </div>
 
+<!-- ═══ MODAL: Stocktake Report ═══ -->
+<div class="mo" id="m-stocktake">
+  <div class="msheet" style="max-height:88vh">
+    <div class="mhandle"></div>
+    <div class="mhead"><span class="mtitle">📋 Stocktake Report</span><button class="mclose" onclick="cm('m-stocktake')">✕</button></div>
+    <div class="mbody" style="padding-bottom:16px">
+      <div class="fld"><label>Stocktake date (as at)</label><input type="date" id="st-date" onchange="renderStocktakePreview()"></div>
+      <div style="display:flex;gap:8px;margin:10px 0 14px">
+        <button class="action-btn btn-blue" style="flex:1" onclick="stocktakeExportPDF()">⬇️ PDF</button>
+        <button class="action-btn btn-ghost" style="flex:1" onclick="stocktakeExportImage()">🖼️ Image</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Preview — trading stock valued at cost (ex GST), for end-of-financial-year stocktake records.</div>
+      <div id="st-preview" style="border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:42vh"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden A4 print element for stocktake export -->
+<div id="stocktake-print" style="display:none;position:absolute;left:-9999px;top:0;width:794px;background:#fff;padding:40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111"></div>
+
 <!-- ═══ MODAL: Dashboard Metric Detail (generic, reused for Total/InStock/Low/Out/Orders) ═══ -->
 <div class="mo" id="m-detail">
   <div class="msheet" style="max-height:85vh">
@@ -1215,8 +1239,9 @@ function api(action, params){
     var qs = Object.keys(q).map(function(k){
       return encodeURIComponent(k)+'='+encodeURIComponent(q[k]===undefined||q[k]===null?'':q[k]);
     }).join('&');
+    qs += '&_=' + Date.now(); // cache-buster: Apps Script GETs are otherwise cached by the browser
     var url = API_URL + (API_URL.indexOf('?')>-1?'&':'?') + qs;
-    fetch(url, {method:'GET', redirect:'follow'})
+    fetch(url, {method:'GET', redirect:'follow', cache:'no-store'})
       .then(function(r){
         if(!r.ok) throw new Error('HTTP '+r.status);
         return r.text();
@@ -1735,6 +1760,7 @@ function invRowHtml(i,canEditStock){
   '</div>';
 }
 function renderInv(){
+  var sb=g('inv-stocktake-btn'); if(sb) sb.style.display=(U&&(U.role==='admin'||U.role==='mod'))?'':'none';
   var s=(g('inv-s').value||'').toLowerCase();
   var f=INV.filter(function(i){
     if(s&&i.name.toLowerCase().indexOf(s)<0&&i.sku.toLowerCase().indexOf(s)<0&&(i.supplierSku||'').toLowerCase().indexOf(s)<0)return false;
@@ -2686,11 +2712,127 @@ function deleteCategoryConfirm(){
   });
 }
 
+// ══════ STOCKTAKE REPORT (EOFY / accountant) ══════
+function openStocktake(){
+  var d=g('st-date');
+  if(d && !d.value){ var now=new Date(); d.value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'); }
+  renderStocktakePreview();
+  om('m-stocktake');
+}
+function stFmtDate(s){
+  try{ var p=s.split('-'); return new Date(p[0],p[1]-1,p[2]).toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return s; }
+}
+function buildStocktakeHTML(){
+  var dateStr=(g('st-date')&&g('st-date').value)||'';
+  var items=INV.slice().sort(function(a,b){
+    var c=(a.cat||'Other').localeCompare(b.cat||'Other'); return c||(a.name||'').localeCompare(b.name||'');
+  });
+  var grand=0, noCost=0, totalUnits=0, lineCount=items.length;
+  var rows='', curCat=null, catTotal=0, catCount=0;
+  function subtotal(){
+    if(curCat===null) return '';
+    return '<tr style="background:#eef2ff;font-weight:700"><td colspan="5" style="padding:6px 10px;text-align:right;border-bottom:1px solid #ddd">Subtotal — '+escHtmlPk(curCat)+' ('+catCount+' items)</td><td style="padding:6px 10px;text-align:right;border-bottom:1px solid #ddd">$'+catTotal.toFixed(2)+'</td></tr>';
+  }
+  items.forEach(function(i){
+    var cat=i.cat||'Other';
+    if(cat!==curCat){ rows+=subtotal(); curCat=cat; catTotal=0; catCount=0; }
+    var qty=Number(i.qty)||0, cost=Number(i.cost)||0, val=qty*cost;
+    if(!(cost>0)) noCost++;
+    grand+=val; catTotal+=val; catCount++; totalUnits+=qty;
+    rows+='<tr>'+
+      '<td style="padding:5px 10px;border-bottom:1px solid #eee">'+escHtmlPk(i.name)+'</td>'+
+      '<td style="padding:5px 10px;border-bottom:1px solid #eee">'+escHtmlPk(cat)+'</td>'+
+      '<td style="padding:5px 10px;border-bottom:1px solid #eee;text-align:right">'+qty+'</td>'+
+      '<td style="padding:5px 10px;border-bottom:1px solid #eee">'+escHtmlPk(i.unit||'')+'</td>'+
+      '<td style="padding:5px 10px;border-bottom:1px solid #eee;text-align:right">'+(cost>0?'$'+cost.toFixed(2):'—')+'</td>'+
+      '<td style="padding:5px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:600">'+(val>0?'$'+val.toFixed(2):'—')+'</td>'+
+    '</tr>';
+  });
+  rows+=subtotal();
+  var preparedBy=(U?(U.fullname||U.username):'');
+  var genNow=new Date().toLocaleString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'});
+  return ''+
+    '<div style="text-align:center;margin-bottom:6px"><div style="font-size:20px;font-weight:800;letter-spacing:.01em">Wrap&amp;Roll Rockhampton</div>'+
+    '<div style="font-size:15px;font-weight:700;margin-top:2px">Stocktake Report</div>'+
+    '<div style="font-size:13px;color:#444;margin-top:2px">As at '+stFmtDate(dateStr)+'</div></div>'+
+    '<div style="font-size:11px;color:#555;text-align:center;margin-bottom:14px">Trading stock valued at cost (ex GST) · Prepared by '+escHtmlPk(preparedBy)+' · Generated '+genNow+'</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+      '<thead><tr style="background:#1e3a8a;color:#fff">'+
+        '<th style="padding:7px 10px;text-align:left">Item</th>'+
+        '<th style="padding:7px 10px;text-align:left">Category</th>'+
+        '<th style="padding:7px 10px;text-align:right">Qty</th>'+
+        '<th style="padding:7px 10px;text-align:left">Unit</th>'+
+        '<th style="padding:7px 10px;text-align:right">Unit Cost</th>'+
+        '<th style="padding:7px 10px;text-align:right">Total Value</th>'+
+      '</tr></thead><tbody>'+rows+'</tbody>'+
+      '<tfoot><tr style="background:#16a34a;color:#fff;font-weight:800;font-size:14px"><td colspan="5" style="padding:10px;text-align:right">TOTAL STOCK VALUE</td><td style="padding:10px;text-align:right">$'+grand.toFixed(2)+'</td></tr></tfoot>'+
+    '</table>'+
+    '<div style="font-size:11px;color:#555;margin-top:12px">Total line items: '+lineCount+' &nbsp;·&nbsp; Total units on hand: '+totalUnits+(noCost>0?(' &nbsp;·&nbsp; <span style="color:#b45309">'+noCost+' item(s) have no cost recorded (counted as $0)</span>'):'')+'</div>'+
+    '<div style="font-size:11px;color:#555;margin-top:18px;display:flex;justify-content:space-between"><div>Counted by: __________________________</div><div>Signature: __________________________</div></div>'+
+    '<div style="font-size:10px;color:#999;margin-top:16px;text-align:center">Keep this stocktake record for at least 5 years (ATO requirement). Valuation method: cost.</div>';
+}
+function renderStocktakePreview(){
+  var el=g('st-preview'); if(el) el.innerHTML='<div style="padding:14px;min-width:560px">'+buildStocktakeHTML()+'</div>';
+}
+function stocktakeFileName(ext){
+  var d=(g('st-date')&&g('st-date').value)||'report';
+  return 'stocktake-'+d+'.'+ext;
+}
+function stocktakeRender(cb){
+  var el=g('stocktake-print');
+  el.innerHTML=buildStocktakeHTML();
+  el.style.display='block';
+  loadHtml2Canvas(function(){
+    html2canvas(el,{scale:2,backgroundColor:'#fff',useCORS:true}).then(function(canvas){
+      el.style.display='none';
+      cb(canvas);
+    }).catch(function(){ el.style.display='none'; });
+  });
+}
+function stocktakeExportImage(){
+  ov('Building image...');
+  stocktakeRender(function(canvas){
+    hov();
+    canvas.toBlob(function(blob){
+      var fname=stocktakeFileName('png');
+      if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],fname,{type:'image/png'})]})){
+        navigator.share({files:[new File([blob],fname,{type:'image/png'})],title:'Stocktake Report'}).catch(function(){});
+      } else {
+        var a=document.createElement('a'); a.download=fname; a.href=URL.createObjectURL(blob); a.click();
+      }
+    },'image/png');
+  });
+}
+function stocktakeExportPDF(){
+  ov('Building PDF...');
+  stocktakeRender(function(canvas){
+    var s2=document.createElement('script');
+    s2.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s2.onload=function(){
+      hov();
+      var pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      var pageW=210, pageH=297;
+      var imgW=pageW, imgH=canvas.height*imgW/canvas.width;
+      var data=canvas.toDataURL('image/png');
+      var heightLeft=imgH, position=0;
+      pdf.addImage(data,'PNG',0,position,imgW,imgH);
+      heightLeft-=pageH;
+      while(heightLeft>0){ position=heightLeft-imgH; pdf.addPage(); pdf.addImage(data,'PNG',0,position,imgW,imgH); heightLeft-=pageH; }
+      pdf.save(stocktakeFileName('pdf'));
+    };
+    s2.onerror=function(){ hov(); alert('Could not load PDF library'); };
+    document.head.appendChild(s2);
+  });
+}
+
 function renderAdmin(){
   var items = (admCatFilter ? INV.filter(function(i){return i.cat===admCatFilter;}) : INV.slice()).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
   g('adm-inv-list').innerHTML=items.map(function(i){
+    var supId = i.supplierSku ? '<span>ID: '+escHtmlPk(String(i.supplierSku))+'</span>' : '';
+    var price = (i.cost&&i.cost>0) ? '<span style="color:var(--blue);font-weight:600">$'+Number(i.cost).toFixed(2)+'</span>' : '';
+    var meta = (supId||price) ? (supId+price) : '<span style="color:var(--text3)">no supplier / price</span>';
     return '<div class="item-row"><div class="item-ico '+(CAT_CLS[i.cat]||'')+'">'+( catIcon(i.cat))+'</div>'+
-      '<div class="item-info"><div class="item-name">'+i.name+'</div><div class="item-meta"><span>'+i.cat+'</span><span>threshold: '+i.threshold+' '+i.unit+'</span>'+((i.cost&&i.cost>0)?'<span style="color:var(--blue);font-weight:600">$'+Number(i.cost).toFixed(2)+'</span>':'')+'</div></div>'+
+      '<div class="item-info"><div class="item-name">'+i.name+'</div><div class="item-meta">'+meta+'</div></div>'+
       '<div style="display:flex;gap:6px;flex-shrink:0">'+
         '<button onclick="openEditItem(\''+i.id+'\')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:#f9fafb;font-size:12px;cursor:pointer;font-weight:600">Edit</button>'+
         '<button onclick="duplicateItem(\''+i.id+'\')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--purple-b);background:var(--purple-bg);color:var(--purple);font-size:12px;cursor:pointer;font-weight:600">⧉</button>'+
@@ -3042,7 +3184,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='5.1';
+var APP_VER='5.2';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
