@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.6</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.7</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1513,7 +1513,7 @@ var PK_PENDING_CT=0;
 function renderDashPickingBox(){
   if(!(U&&U.role==='admin')) return;
   api('getPickRequests').then(function(r){
-    var reqs=(r.ok&&r.data)?r.data:[];
+    var reqs = Array.isArray(r) ? r : ((r&&r.ok&&r.data) ? r.data : []);
     PK_REQS=reqs;
     var pending=reqs.filter(function(x){return x.status==='Pending';});
     PK_PENDING_CT=pending.length;
@@ -3222,7 +3222,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='5.6';
+var APP_VER='5.7';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -5944,7 +5944,7 @@ function pkAdminTarget(){ return g('pk-admin-inner')||g('pick-admin-view'); }
 function loadPickRequests(){
   pkAdminTarget().innerHTML='<div style="padding:30px;text-align:center;color:var(--text3)">Loading requests…</div>';
   api('getPickRequests').then(function(r){
-    PK_REQS=(r.ok&&r.data)?r.data:[];
+    PK_REQS = Array.isArray(r) ? r : ((r&&r.ok&&r.data) ? r.data : []);
     renderPickAdmin();
   });
 }
