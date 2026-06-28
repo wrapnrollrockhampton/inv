@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.8</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.9</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -2776,7 +2776,7 @@ function buildStocktakeHTML(){
   var rows='', curCat=null, catTotal=0, catCount=0;
   function subtotal(){
     if(curCat===null) return '';
-    return '<tr style="background:#eef2ff;font-weight:700"><td colspan="5" style="padding:6px 10px;text-align:right;border-bottom:1px solid #ddd">Subtotal — '+escHtmlPk(curCat)+' ('+catCount+' items)</td><td style="padding:6px 10px;text-align:right;border-bottom:1px solid #ddd">$'+catTotal.toFixed(2)+'</td></tr>';
+    return '<tr style="background:#eef2ff;font-weight:700"><td colspan="6" style="padding:6px 10px;text-align:right;border-bottom:1px solid #ddd">Subtotal — '+escHtmlPk(curCat)+' ('+catCount+' items)</td><td style="padding:6px 10px;text-align:right;border-bottom:1px solid #ddd">$'+catTotal.toFixed(2)+'</td></tr>';
   }
   items.forEach(function(i){
     var cat=i.cat||'Other';
@@ -2787,6 +2787,7 @@ function buildStocktakeHTML(){
     rows+='<tr>'+
       '<td style="padding:5px 10px;border-bottom:1px solid #eee">'+escHtmlPk(i.name)+'</td>'+
       '<td style="padding:5px 10px;border-bottom:1px solid #eee">'+escHtmlPk(cat)+'</td>'+
+      '<td style="padding:5px 10px;border-bottom:1px solid #eee;color:#444">'+escHtmlPk(i.supplierName||'—')+'</td>'+
       '<td style="padding:5px 10px;border-bottom:1px solid #eee;text-align:right">'+qty+'</td>'+
       '<td style="padding:5px 10px;border-bottom:1px solid #eee">'+escHtmlPk(i.unit||'')+'</td>'+
       '<td style="padding:5px 10px;border-bottom:1px solid #eee;text-align:right">'+(cost>0?'$'+cost.toFixed(2):'—')+'</td>'+
@@ -2805,16 +2806,18 @@ function buildStocktakeHTML(){
       '<thead><tr style="background:#1e3a8a;color:#fff">'+
         '<th style="padding:7px 10px;text-align:left">Item</th>'+
         '<th style="padding:7px 10px;text-align:left">Category</th>'+
+        '<th style="padding:7px 10px;text-align:left">Supplier</th>'+
         '<th style="padding:7px 10px;text-align:right">Qty</th>'+
         '<th style="padding:7px 10px;text-align:left">Unit</th>'+
         '<th style="padding:7px 10px;text-align:right">Unit Cost</th>'+
         '<th style="padding:7px 10px;text-align:right">Total Value</th>'+
       '</tr></thead><tbody>'+rows+'</tbody>'+
-      '<tfoot><tr style="background:#16a34a;color:#fff;font-weight:800;font-size:14px"><td colspan="5" style="padding:10px;text-align:right">TOTAL STOCK VALUE</td><td style="padding:10px;text-align:right">$'+grand.toFixed(2)+'</td></tr></tfoot>'+
+      '<tfoot><tr style="background:#16a34a;color:#fff;font-weight:800;font-size:14px"><td colspan="6" style="padding:10px;text-align:right">TOTAL STOCK VALUE</td><td style="padding:10px;text-align:right">$'+grand.toFixed(2)+'</td></tr></tfoot>'+
     '</table>'+
     '<div style="font-size:11px;color:#555;margin-top:12px">Total line items: '+lineCount+' &nbsp;·&nbsp; Total units on hand: '+totalUnits+(noCost>0?(' &nbsp;·&nbsp; <span style="color:#b45309">'+noCost+' item(s) have no cost recorded (counted as $0)</span>'):'')+'</div>'+
-    '<div style="font-size:11px;color:#555;margin-top:18px;display:flex;justify-content:space-between"><div>Counted by: __________________________</div><div>Signature: __________________________</div></div>'+
-    '<div style="font-size:10px;color:#999;margin-top:16px;text-align:center">Keep this stocktake record for at least 5 years (ATO requirement). Valuation method: cost.</div>';
+    '<div style="font-size:10.5px;color:#777;margin-top:8px;line-height:1.5">Stock valued at cost price excluding GST (not menu/sale price). Damaged, spoiled or out-of-date stock should be written off and valued at nil before finalising.</div>'+
+    '<div style="font-size:11px;color:#555;margin-top:18px;display:flex;justify-content:space-between;gap:12px"><div>Counted by: ____________________</div><div>Signature: ____________________</div><div>Date: ______________</div></div>'+
+    '<div style="font-size:10px;color:#999;margin-top:16px;text-align:center">Keep this stocktake record for at least 5 years (ATO requirement). Valuation method: cost (ex GST).</div>';
 }
 function renderStocktakePreview(){
   var el=g('st-preview'); if(el) el.innerHTML='<div style="padding:14px;min-width:560px">'+buildStocktakeHTML()+'</div>';
@@ -3237,7 +3240,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='5.8';
+var APP_VER='5.9';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
