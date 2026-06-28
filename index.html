@@ -262,14 +262,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 .ico-frz{background:#ecfdf5}
 .ico-bev{background:#fffbeb}
 .item-info{flex:1;min-width:0}
-.item-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.item-meta{font-size:12px;color:var(--text2);margin-top:2px;display:flex;align-items:center;gap:6px}
+.item-name{font-size:14px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.item-meta{font-size:12px;color:var(--text2);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .item-right{text-align:right;flex-shrink:0}
 .item-qty{font-size:18px;font-weight:700}
-.qty-stepper{display:flex;align-items:center;gap:6px}
-.qty-step-btn{width:24px;height:24px;border-radius:7px;border:1.5px solid var(--border);background:#f9fafb;font-size:15px;font-weight:700;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1}
+.qty-stepper{display:flex;align-items:center;gap:4px}
+.qty-step-btn{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--border);background:#f9fafb;font-size:14px;font-weight:700;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1}
 .qty-step-btn:active{background:var(--blue-bg);border-color:var(--blue-b);color:var(--blue)}
-.qty-tap{cursor:pointer;min-width:28px;text-align:center;border-bottom:1px dashed var(--text3);padding-bottom:1px}
+.qty-tap{cursor:pointer;min-width:24px;text-align:center;border-bottom:1px dashed var(--text3);padding-bottom:1px}
 .qty-inline-input{width:54px;font-size:17px;font-weight:700;text-align:center;padding:3px 2px;border:1.5px solid var(--blue);border-radius:7px;font-family:inherit;color:var(--text)}
 .item-unit{font-size:11px;color:var(--text2);margin-top:1px}
 .status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.7</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v5.8</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -960,7 +960,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         </div>
         <div class="fld">
           <label>Cost / unit ($)</label>
-          <input type="number" id="i-cost" value="0" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
+          <input type="text" id="i-cost" value="0" inputmode="decimal" placeholder="0.00" autocomplete="off">
+          <div class="fld-hint">Type . or , for decimals (e.g. 35.15 or 35,15)</div>
         </div>
       </div>
       <input type="hidden" id="i-id">
@@ -2212,6 +2213,12 @@ g && document.addEventListener('DOMContentLoaded',function(){
   if(newCatSel) newCatSel.addEventListener('change',function(){
     if(ordSelected&&ordSelected.isNew){ordSelected.cat=this.value;showOrdSelected();}
   });
+  var costInp=g('i-cost');
+  if(costInp) costInp.addEventListener('input',function(){
+    var v=this.value.replace(/,/g,'.').replace(/[^0-9.]/g,'');
+    var p=v.split('.'); if(p.length>2) v=p[0]+'.'+p.slice(1).join('');
+    if(v!==this.value) this.value=v;
+  });
 });
 
 // --- Submit ---
@@ -2985,13 +2992,21 @@ function doDeleteItem(id){
     }
   });
 }
+function parsePrice(v){
+  v=String(v==null?'':v).trim();
+  if(v.indexOf(',')>-1 && v.indexOf('.')>-1){ v=v.replace(/,/g,''); }   // 1,234.56 -> 1234.56
+  else { v=v.replace(/,/g,'.'); }                                        // 35,15 -> 35.15
+  v=v.replace(/[^0-9.]/g,'');                                            // strip stray chars
+  var parts=v.split('.'); if(parts.length>2){ v=parts[0]+'.'+parts.slice(1).join(''); }
+  var n=parseFloat(v); return isNaN(n)?0:n;
+}
 function saveItem(){
   var sku=g('i-sku').value.trim().toUpperCase(),name=g('i-name').value.trim();
   var cat=g('i-cat').value,unit=g('i-unit').value.trim();
   var qty=g('i-qty').value,thr=g('i-thr').value,id=g('i-id').value;
   var supplierSku=g('i-supplier-sku').value.trim();
   var supplierName=g('i-supplier-name').value.trim();
-  var cost=parseFloat(g('i-cost').value)||0;
+  var cost=parsePrice(g('i-cost').value);
   if(!name||!unit){showMsg('i-msg','err','Please enter item name and unit');return;}
 
   if(id){
@@ -3222,7 +3237,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='5.7';
+var APP_VER='5.8';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -5625,12 +5640,14 @@ function rcClassify(text){
   RC_KNOWN=[]; RC_NEW=[]; var seen={};
   for(var i=0;i<lines.length;i++){
     var line=lines[i];
+    if(rcIsFooter(line)) continue;              // skip "thank you...", totals, bank info etc.
     rule.codeRe.lastIndex=0;
     var cm=rule.codeRe.exec(line);
     if(!cm) continue;
     var code=cm[1];
     if(seen[code]) continue;
-    var ctx=line+' '+(lines[i+1]||'');
+    var nextLine=lines[i+1]||''; if(rcIsFooter(nextLine)) nextLine=''; // don't let footer leak into name
+    var ctx=line+' '+nextLine;
     var info=rcExtractRow(ctx,code,rule.qtyRule);
     if(!info||info.qty==null||info.qty<=0) continue;
     seen[code]=true;
@@ -5677,6 +5694,10 @@ function rcExtractRow(ctx,code,rule){
   return null;
 }
 function rcClean(s){if(!s)return null;s=s.replace(/\s+/g,' ').trim().replace(/^[\-–|:\s]+/,'').replace(/[\-–|:\s]+$/,'');if(s.length<3)return null;return s.length>46?s.slice(0,46):s;}
+// Non-product lines on an invoice (footer/totals/bank) — never treated as items
+function rcIsFooter(line){
+  return /thank\s*you|continued\s+support|remittance|please\s+pay|terms\s+(and|&)|\be\s*&\s*o\s*e\b|gst\s+(included|total|amount)|total\s+(due|amount|incl|excl|gst|qty|weight)|sub\s*-?\s*total|amount\s+(due|payable)|\bbsb\b|account\s+(name|no|number)|page\s+\d+\s+of|invoice\s+total|balance\s+(due|owing)|delivery\s+(docket|address)/i.test(line);
+}
 function rcEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 function rcRender(){
@@ -5702,8 +5723,8 @@ function rcRender(){
           costLine='<div class="rc-ccost">cost $'+it.cost.toFixed(2)+'/unit (new)'+packNote+'</div>';
         }
       }
-      return '<div class="rc-card known"><div class="rc-cinfo"><div class="rc-cname">'+rcEsc(it.name)+'</div>'+
-        '<div class="rc-cid">ID '+it.code+' · in stock: '+it.curQty+(it.pack&&it.pack>1?' · '+it.cartons+' ctn × '+it.pack:'')+'</div>'+costLine+'</div>'+
+      return '<div class="rc-card known"><div class="rc-cinfo"><div class="rc-cname">'+(it.overwrite?'<span style="color:#7c3aed;font-size:10px;font-weight:800;border:1px solid #ddd6fe;background:#f5f3ff;padding:1px 5px;border-radius:5px;margin-right:5px">✏️ RENAME</span>':'')+rcEsc(it.name)+'</div>'+
+        '<div class="rc-cid">ID '+it.code+' · in stock: '+it.curQty+(it.pack&&it.pack>1?' · '+it.cartons+' ctn × '+it.pack:'')+(it.overwrite?' · overwrites existing item':'')+'</div>'+costLine+'</div>'+
         '<div class="rc-qty"><button class="rc-qstep" data-k="'+idx+'" data-act="dec">−</button>'+
         '<input class="rc-qinput" type="number" inputmode="decimal" value="'+it.qty+'" data-k="'+idx+'">'+
         '<button class="rc-qstep" data-k="'+idx+'" data-act="inc">+</button></div><span class="rc-unit">'+it.unit+'</span></div>';
@@ -5718,7 +5739,10 @@ function rcRender(){
       return '<div class="rc-newcard"><div class="rc-newtop"><div style="flex:1;min-width:0">'+
         '<div class="rc-newname'+(it.name?'':' blank')+'">'+(it.name?rcEsc(it.name):'(name not read — add manually)')+'</div>'+
         '<div class="rc-newmeta">Supplier ID <b>'+it.code+'</b> · qty '+it.qty+breakdown+costTxt+'</div></div>'+
-        '<button class="rc-addbtn'+(it.added?' done':'')+'" data-n="'+idx+'">'+(it.added?'✓ Added':'+ Add')+'</button></div></div>';
+        '<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">'+
+          '<button class="rc-addbtn'+(it.added?' done':'')+'" data-n="'+idx+'">'+(it.added?'✓ Added':'+ Add new')+'</button>'+
+          '<button data-exist="'+idx+'" style="font-size:11px;font-weight:700;color:var(--blue);background:var(--blue-bg);border:none;border-radius:8px;padding:6px 9px;cursor:pointer;font-family:inherit;white-space:nowrap">📌 Existing</button>'+
+        '</div></div></div>';
     }).join('');
   } else { html+='<div class="rc-none">Every scanned ID already exists 🎉</div>'; }
   g('rc-results').innerHTML=html;
@@ -5726,6 +5750,7 @@ function rcRender(){
   g('rc-results').querySelectorAll('.rc-qstep').forEach(function(b){b.addEventListener('click',function(){var i=+b.getAttribute('data-k'),a=b.getAttribute('data-act');RC_KNOWN[i].qty=a==='inc'?RC_KNOWN[i].qty+1:Math.max(0,RC_KNOWN[i].qty-1);rcRender();rcUpdateBar();});});
   g('rc-results').querySelectorAll('.rc-qinput').forEach(function(inp){inp.addEventListener('input',function(){var i=+inp.getAttribute('data-k');var v=parseFloat(inp.value);RC_KNOWN[i].qty=isNaN(v)?0:v;rcUpdateBar();});});
   g('rc-results').querySelectorAll('.rc-addbtn').forEach(function(b){b.addEventListener('click',function(){rcOpenAdd(+b.getAttribute('data-n'));});});
+  g('rc-results').querySelectorAll('[data-exist]').forEach(function(b){b.addEventListener('click',function(){rcOpenExisting(+b.getAttribute('data-exist'));});});
 }
 
 function rcUpdateBar(){
@@ -5768,6 +5793,54 @@ function rcMarkAddedByCode(code){
   if(it){ it.added=true; rcRender(); rcUpdateBar(); }
 }
 
+// ── Map a scanned NEW item onto an EXISTING inventory item (overwrite name/code, add qty) ──
+var RC_EXIST_IDX=-1;
+function rcOpenExisting(idx){
+  if(idx<0||idx>=RC_NEW.length)return;
+  RC_EXIST_IDX=idx; var it=RC_NEW[idx];
+  var ov=document.createElement('div');
+  ov.id='rc-exist-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+  ov.innerHTML='<div style="background:#fff;width:100%;max-width:480px;max-height:82vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'+
+    '<div style="padding:16px 18px 12px;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:16px;font-weight:800">📌 Add to existing item</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-top:3px;line-height:1.4">Scanned: <b>'+rcEsc(it.name||it.code)+'</b> · qty '+it.qty+'<br>Pick the inventory item to update — its <b>name</b> and <b>supplier ID</b> will be replaced with this scanned product, and the qty added to its stock.</div>'+
+      '<input id="rc-exist-q" placeholder="Search inventory by name or ID…" style="width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box">'+
+    '</div>'+
+    '<div id="rc-exist-list" style="overflow-y:auto;padding:8px;flex:1"></div>'+
+    '<button onclick="rcCloseExisting()" style="margin:8px 18px 16px;padding:12px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>'+
+  '</div>';
+  document.body.appendChild(ov);
+  rcRenderExistList('');
+  var q=g('rc-exist-q');
+  if(q){ q.addEventListener('input',function(){rcRenderExistList(this.value);}); setTimeout(function(){q.focus();},60); }
+  ov.addEventListener('click',function(e){ if(e.target===ov) rcCloseExisting(); });
+}
+function rcCloseExisting(){ var ov=g('rc-exist-ov'); if(ov)ov.remove(); RC_EXIST_IDX=-1; }
+function rcRenderExistList(q){
+  q=(q||'').toLowerCase().trim();
+  var items=INV.filter(function(x){return !q||(x.name||'').toLowerCase().indexOf(q)>-1||String(x.supplierSku||'').toLowerCase().indexOf(q)>-1;})
+    .sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).slice(0,60);
+  var el=g('rc-exist-list'); if(!el)return;
+  if(!items.length){ el.innerHTML='<div style="padding:26px;text-align:center;color:var(--text3);font-size:13px">No matching items</div>'; return; }
+  el.innerHTML=items.map(function(x){
+    return '<div onclick="rcMapToExisting(\''+x.id+'\')" style="padding:11px 12px;border-radius:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid #f3f4f6">'+
+      '<div style="min-width:0"><div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+rcEsc(x.name)+'</div>'+
+      '<div style="font-size:11px;color:var(--text3)">in stock: '+(x.qty||0)+' '+(x.unit||'')+(x.supplierSku?' · ID '+rcEsc(String(x.supplierSku)):'')+'</div></div>'+
+      '<span style="font-size:13px;font-weight:800;color:var(--blue);flex-shrink:0">Select →</span></div>';
+  }).join('');
+}
+function rcMapToExisting(invId){
+  var idx=RC_EXIST_IDX; if(idx<0||idx>=RC_NEW.length){ rcCloseExisting(); return; }
+  var it=RC_NEW[idx];
+  var inv=INV.find(function(x){return x.id===invId;}); if(!inv){ rcCloseExisting(); return; }
+  // Move NEW → KNOWN as an overwrite update to the existing item
+  RC_KNOWN.push({id:inv.id, code:it.code, name:(it.name||inv.name), unit:inv.unit||it.unit||'EA', curQty:(inv.qty||0), qty:it.qty, cartons:(it.cartons||it.qty), cost:it.cost, pack:(it.pack||1), inv:inv, overwrite:true});
+  RC_NEW.splice(idx,1);
+  rcCloseExisting();
+  rcRender(); rcUpdateBar();
+}
+
 g('rc-raw-toggle').addEventListener('click',function(){var b=g('rc-raw');var on=b.style.display==='none';b.style.display=on?'block':'none';this.textContent=on?'Hide what the scan read ▴':'Show what the scan read ▾';});
 
 // Save → update real inventory (optimistic, no full reload)
@@ -5785,8 +5858,9 @@ g('rc-save-btn').addEventListener('click',function(){
     if(invItem){
       invItem.qty=newQty;
       if(it.cost!=null) invItem.cost=it.cost; // store cost if your sheet has it
+      if(it.overwrite){ if(it.name) invItem.name=it.name; invItem.supplierSku=it.code; invItem.supplierName=RC_SUP; }
     }
-    api('updateItem',{itemId:it.id, sku:(invItem?invItem.sku:''), name:(invItem?invItem.name:it.name), cat:(invItem?invItem.cat:''), qty:newQty, unit:(invItem?invItem.unit:it.unit), threshold:(invItem?invItem.threshold:0), username:(U?U.username:''), supplierSku:it.code, supplierName:RC_SUP, cost:(it.cost!=null?it.cost:'')}).then(function(){
+    api('updateItem',{itemId:it.id, sku:(invItem?invItem.sku:''), name:(it.overwrite?(it.name||(invItem?invItem.name:'')):(invItem?invItem.name:it.name)), cat:(invItem?invItem.cat:''), qty:newQty, unit:(invItem?invItem.unit:it.unit), threshold:(invItem?invItem.threshold:0), username:(U?U.username:''), supplierSku:it.code, supplierName:RC_SUP, cost:(it.cost!=null?it.cost:'')}).then(function(){
       done++;
       if(done===ups.length){
         hov();
