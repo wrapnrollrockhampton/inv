@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.1</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.2</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1417,46 +1417,68 @@ function startApp(){
 }
 function loadAll(){
   ovStart('Loading...');
-  setLoadPct(8);
-  loadCategories(); // load category list + fill dropdowns/pills (async, non-blocking)
-  api('getInventory').then(function(r1){
-    INV=(r1.ok&&r1.data)?r1.data:[];
-    setLoadPct(38);
-    api('getTransactions').then(function(r2){
-      TX=(r2.ok&&r2.data)?r2.data:[];
-      setLoadPct(64);
-      api('getAttendance',{username:((REAL_ADMIN&&REAL_ADMIN.role==='admin')||(U&&U.role==='mod'))?'':U.username}).then(function(r3){
-        setLoadPct(90);
-        ATTENDANCE=(r3.ok&&r3.data)?r3.data.map(function(a){
-          return Object.assign({},a,{date:safeDate(a.date)});
-        }):[];
-        var isRealAdmin=REAL_ADMIN&&REAL_ADMIN.role==='admin';
-        var viewAsAdmin = U&&U.role==='admin';
-        var isMod = U&&U.role==='mod';
-        var adminContent=g('admin-dash-content');
-        var staffSection=g('staff-dash-section');
-        // Dashboard overview page shows for admin + mod; check-in page content for staff + mod
-        if(adminContent) adminContent.style.display=(viewAsAdmin||isMod)?'block':'none';
-        if(staffSection) staffSection.style.display='block';
-        // Render the right data
-        if(isRealAdmin){
-          renderInv();renderAna();
-          if(viewAsAdmin){renderDash();renderAdmin();renderPayroll();}
-          else{renderStaffDash();}
-        } else if(isMod){
-          renderInv();
-          renderDash();        // overview for mod
-          renderStaffDash();   // check-in/pay for mod
-        } else {
-          renderInv();
-          renderStaffDash();
-        }
-        setLoadPct(100);
-        setTimeout(hov,150); // brief pause so 100% is visible
-        loadOrderSuggestions();
-      });
-    });
+  setLoadPct(5);
+
+  // ── Show cached data INSTANTLY while fresh data loads in background ──
+  try{
+    var ci=localStorage.getItem('wr_inv'); if(ci){ INV=JSON.parse(ci); }
+    var ct=localStorage.getItem('wr_tx'); if(ct) TX=JSON.parse(ct);
+    var ca=localStorage.getItem('wr_att'); if(ca) ATTENDANCE=JSON.parse(ca).map(function(a){return Object.assign({},a,{date:safeDate(a.date)});});
+    var cc=localStorage.getItem('wr_cat'); if(cc){ CATEGORIES=JSON.parse(cc); fillCategoryUI(); }
+    if(INV.length){ quickRender(); setLoadPct(30); } // show stale data immediately
+  }catch(e){}
+
+  // ── Load ALL data in PARALLEL instead of sequential chain ──
+  var p1=api('getInventory');
+  var p2=api('getTransactions');
+  var p3=api('getAttendance',{username:((REAL_ADMIN&&REAL_ADMIN.role==='admin')||(U&&U.role==='mod'))?'':U.username});
+  var p4=api('getCategories');
+
+  Promise.all([p1,p2,p3,p4]).then(function(results){
+    var r1=results[0], r2=results[1], r3=results[2], r4=results[3];
+    INV=(r1&&r1.ok&&r1.data)?r1.data:[];
+    TX=(r2&&r2.ok&&r2.data)?r2.data:[];
+    ATTENDANCE=(r3&&r3.ok&&r3.data)?r3.data.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):(Array.isArray(r3)?r3.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):[]); 
+    CATEGORIES=(r4&&r4.ok&&r4.data&&r4.data.length)?r4.data:(CATEGORIES.length?CATEGORIES:[{name:'Dry Goods',icon:'🌾'},{name:'Frozen',icon:'❄️'},{name:'Beverage',icon:'🥤'},{name:'Meat',icon:'🥩'}]);
+    fillCategoryUI();
+
+    // Cache for instant next load
+    try{
+      localStorage.setItem('wr_inv',JSON.stringify(INV));
+      localStorage.setItem('wr_tx',JSON.stringify(TX));
+      localStorage.setItem('wr_att',JSON.stringify(ATTENDANCE));
+      localStorage.setItem('wr_cat',JSON.stringify(CATEGORIES));
+    }catch(e){}
+
+    setLoadPct(90);
+    quickRender();
+    setLoadPct(100);
+    setTimeout(hov,120);
+    // Non-critical data loads after UI is visible
+    loadOrderSuggestions();
+  }).catch(function(err){
+    console.error('loadAll error',err);
+    setLoadPct(100); hov();
   });
+}
+// Render everything based on role — used by loadAll + cache restore
+function quickRender(){
+  var isRealAdmin=REAL_ADMIN&&REAL_ADMIN.role==='admin';
+  var viewAsAdmin=U&&U.role==='admin';
+  var isMod=U&&U.role==='mod';
+  var adminContent=g('admin-dash-content');
+  var staffSection=g('staff-dash-section');
+  if(adminContent) adminContent.style.display=(viewAsAdmin||isMod)?'block':'none';
+  if(staffSection) staffSection.style.display='block';
+  if(isRealAdmin){
+    renderInv();renderAna();
+    if(viewAsAdmin){renderDash();renderAdmin();renderPayroll();}
+    else{renderStaffDash();}
+  } else if(isMod){
+    renderInv();renderDash();renderStaffDash();
+  } else {
+    renderInv();renderStaffDash();
+  }
 }
 
 // ════ NAV ════
@@ -3256,7 +3278,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='6.1';
+var APP_VER='6.2';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
