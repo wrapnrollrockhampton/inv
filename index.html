@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.3</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.4</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -749,7 +749,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
     <div class="page" id="page-payroll">
       <div class="scard" id="payroll-report-section"></div>
       <div class="scard">
-        <div class="scard-hd"><span class="scard-title">🗓 Attendance Calendar</span></div>
+        <div class="scard-hd" style="display:flex;align-items:center;gap:8px">
+          <button onclick="PAYROLL_CAL_OFFSET--;renderPayrollCal()" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:#f9fafb;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">◀</button>
+          <span class="scard-title" id="payroll-cal-title" style="flex:1;text-align:center">🗓 Attendance Calendar</span>
+          <button onclick="if(PAYROLL_CAL_OFFSET<0){PAYROLL_CAL_OFFSET++;renderPayrollCal()}" id="payroll-cal-fwd" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:#f9fafb;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">▶</button>
+        </div>
         <div id="payroll-cal" style="padding:8px 12px 12px"></div>
       </div>
       <div id="payroll-day-section" style="padding:0 0 12px"></div>
@@ -3278,7 +3282,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='6.3';
+var APP_VER='6.4';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -3387,6 +3391,7 @@ function getShiftRateMode(rec, user){
 var PAYROLL_SEL_DATE = localToday();
 var PAYROLL_SELECT_MODE = false;
 var PAYROLL_SELECTED = {}; // id → true
+var PAYROLL_CAL_OFFSET = 0; // 0=this month, -1=last month, etc.
 
 function getDayMult(dateStr, user){
   var d=safeNewDate(dateStr), dow=d.getDay();
@@ -4144,9 +4149,17 @@ async function exportPayrollPDF(){
 // ── Payroll Calendar ──────────────────
 function renderPayrollCal(){
   var cal=g('payroll-cal');if(!cal)return;
-  var now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
+  var now=new Date();
+  var viewDate=new Date(now.getFullYear(),now.getMonth()+PAYROLL_CAL_OFFSET,1);
+  var yr=viewDate.getFullYear(),mo=viewDate.getMonth();
+  var isCurrentMonth=(PAYROLL_CAL_OFFSET===0);
   var dim=new Date(yr,mo+1,0).getDate(),fdow=new Date(yr,mo,1).getDay();
   var DS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+  var monthLabel=viewDate.toLocaleDateString('en-AU',{month:'long',year:'numeric'});
+  var titleEl=g('payroll-cal-title');
+  if(titleEl) titleEl.textContent='🗓 '+(isCurrentMonth?'This month':monthLabel);
+  var fwdBtn=g('payroll-cal-fwd');
+  if(fwdBtn){ fwdBtn.style.color=isCurrentMonth?'var(--text3)':'var(--text)'; fwdBtn.style.background=isCurrentMonth?'#f3f4f6':'#f9fafb'; }
 
   function ds(d){return yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
   function daySt(d){
