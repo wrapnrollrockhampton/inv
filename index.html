@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.4</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.5</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3282,7 +3282,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='6.4';
+var APP_VER='6.5';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4993,8 +4993,11 @@ function loadRevenue(){
   loadOneOffExpenses();
   loadCashActual();
   ov('Loading Square data...');
-  // Previous period (7 days earlier) for week-over-week comparison
-  var prevFrom=shiftDateStr(dates.from,-7), prevTo=shiftDateStr(dates.to,-7);
+  // Previous period for week-over-week comparison.
+  // Cap to today so we compare apples-to-apples: if today is Thursday,
+  // compare Mon–Thu this week vs Mon–Thu last week (not the full 7-day last week).
+  var effectiveTo = dates.to <= localToday() ? dates.to : localToday();
+  var prevFrom=shiftDateStr(dates.from,-7), prevTo=shiftDateStr(effectiveTo,-7);
   api('getSquareSales',{dateFrom:dates.from,dateTo:dates.to}).then(function(r){
     if(!r.ok){ hov(); alert('Square error: '+r.msg); return; }
     REV_DATA=r;
@@ -5058,8 +5061,9 @@ function renderRevenuePage(){
     if(prev && prev>0){
       var pct=Math.round((cur-prev)/prev*100);
       var col=pct>=0?'var(--green)':'var(--red)';
+      var partial=(effectiveTo < dates.to)?' (to '+new Date(effectiveTo+'T00:00:00').toLocaleDateString('en-AU',{weekday:'short'})+')':'';
       el.style.color=col;
-      el.textContent=(pct>=0?'▲ +':'▼ ')+pct+'% vs last week';
+      el.textContent=(pct>=0?'▲ +':'▼ ')+pct+'% vs last week'+partial;
     } else { el.textContent=''; }
   }
   if(REV_PREV&&REV_PREV.summary){
@@ -6106,6 +6110,7 @@ function renderPickAdmin(){
   tgt.innerHTML=html;
   tgt.querySelectorAll('.pk-reqtop').forEach(function(t){t.addEventListener('click',function(){t.parentElement.querySelector('.pk-reqbody').classList.toggle('on');});});
   tgt.querySelectorAll('[data-pkapprove]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkApprove(b.getAttribute('data-pkapprove'));});});
+  tgt.querySelectorAll('[data-pkedit]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkEditRequest(b.getAttribute('data-pkedit'));});});
   tgt.querySelectorAll('[data-pkreject]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkReject(b.getAttribute('data-pkreject'));});});
   tgt.querySelectorAll('[data-pkpicked]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkPicked(b.getAttribute('data-pkpicked'));});});
   tgt.querySelectorAll('[data-pkreport]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pkReport(b.getAttribute('data-pkreport'));});});
@@ -6119,7 +6124,7 @@ function pkReqCard(r){
   }).join('');
   var actions;
   if(r.status==='Pending'){
-    actions = '<div style="display:flex;gap:8px;margin-top:14px"><button class="pk-app-btn" data-pkapprove="'+r.id+'" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--green);color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">✓ Approve &amp; deduct</button><button data-pkreport="'+r.id+'" style="padding:11px 14px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:13px;cursor:pointer">📄</button><button data-pkreject="'+r.id+'" style="padding:11px 14px;border-radius:10px;border:1px solid #fecaca;background:#fef2f2;color:var(--red);font-size:13px;font-weight:700;cursor:pointer">✕</button></div>';
+    actions = '<div style="display:flex;gap:8px;margin-top:14px"><button class="pk-app-btn" data-pkapprove="'+r.id+'" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--green);color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">✓ Approve &amp; deduct</button><button data-pkedit="'+r.id+'" style="padding:11px 14px;border-radius:10px;border:1px solid var(--blue-b);background:var(--blue-bg);color:var(--blue);font-size:13px;font-weight:700;cursor:pointer">✏️</button><button data-pkreport="'+r.id+'" style="padding:11px 14px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:13px;cursor:pointer">📄</button><button data-pkreject="'+r.id+'" style="padding:11px 14px;border-radius:10px;border:1px solid #fecaca;background:#fef2f2;color:var(--red);font-size:13px;font-weight:700;cursor:pointer">✕</button></div>';
   } else if(r.status==='Approved'){
     actions = '<div style="display:flex;gap:8px;margin-top:14px"><button data-pkpicked="'+r.id+'" style="flex:1;padding:11px;border-radius:10px;border:none;background:#16a34a;color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">✓ Picked — clear</button><button data-pkreport="'+r.id+'" style="padding:11px 14px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:13px;cursor:pointer">📄</button></div>';
   } else {
@@ -6140,6 +6145,104 @@ function pkApprove(id){
     r.status='Approved';
     if(typeof renderInv==='function') renderInv();
     if(typeof renderDash==='function') renderDash();
+    renderPickAdmin();
+  });
+}
+
+// ── Edit a pending pick request before approving ──
+var PK_EDIT_ID='', PK_EDIT_ITEMS=[];
+function pkEditRequest(id){
+  var r=PK_REQS.find(function(x){return x.id===id;}); if(!r)return;
+  PK_EDIT_ID=id;
+  PK_EDIT_ITEMS=r.items.map(function(it){return Object.assign({},it);});
+  pkRenderEditModal();
+}
+function pkRenderEditModal(){
+  var old=document.getElementById('pk-edit-ov'); if(old) old.remove();
+  var ov2=document.createElement('div'); ov2.id='pk-edit-ov';
+  ov2.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+  var html='<div style="background:#fff;width:100%;max-width:480px;max-height:88vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'+
+    '<div style="padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">'+
+      '<div style="font-size:16px;font-weight:800">✏️ Edit picking list</div>'+
+      '<button onclick="pkCloseEdit()" style="font-size:18px;background:none;border:none;cursor:pointer;color:var(--text2);padding:4px 8px">✕</button>'+
+    '</div>'+
+    '<div id="pk-edit-list" style="overflow-y:auto;flex:1;padding:8px 14px"></div>'+
+    '<div style="padding:12px 18px 16px;border-top:1px solid var(--border);display:flex;gap:8px">'+
+      '<button onclick="pkEditAddItem()" style="flex:1;padding:12px;border-radius:10px;border:1.5px dashed var(--border);background:transparent;font-size:13px;font-weight:700;color:var(--blue);cursor:pointer;font-family:inherit">+ Add item</button>'+
+      '<button onclick="pkEditSave()" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">💾 Save changes</button>'+
+    '</div>'+
+  '</div>';
+  ov2.innerHTML=html;
+  document.body.appendChild(ov2);
+  ov2.addEventListener('click',function(e){if(e.target===ov2) pkCloseEdit();});
+  pkRenderEditList();
+}
+function pkCloseEdit(){ var el=document.getElementById('pk-edit-ov'); if(el) el.remove(); PK_EDIT_ID=''; PK_EDIT_ITEMS=[]; }
+function pkRenderEditList(){
+  var el=document.getElementById('pk-edit-list'); if(!el) return;
+  if(!PK_EDIT_ITEMS.length){ el.innerHTML='<div style="padding:30px;text-align:center;color:var(--text3);font-size:13px">No items — tap <b>+ Add item</b></div>'; return; }
+  el.innerHTML=PK_EDIT_ITEMS.map(function(it,i){
+    var inv=it.itemId?INV.find(function(x){return x.id===it.itemId;}):null;
+    var stock=inv?(' · in stock: '+inv.qty):'';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f3f4f6">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtmlPk(it.name)+'</div>'+
+        '<div style="font-size:11px;color:var(--text3)">'+(it.cat||'Other')+stock+'</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">'+
+        '<button onclick="pkEditQty('+i+',-1)" style="width:26px;height:26px;border-radius:7px;border:1.5px solid var(--border);background:#f9fafb;font-size:14px;font-weight:700;cursor:pointer">−</button>'+
+        '<input type="text" inputmode="numeric" value="'+it.qty+'" onchange="pkEditSetQty('+i+',this.value)" style="width:42px;text-align:center;border:1px solid var(--border);border-radius:7px;padding:4px 2px;font-size:14px;font-weight:700;font-family:inherit">'+
+        '<button onclick="pkEditQty('+i+',1)" style="width:26px;height:26px;border-radius:7px;border:1.5px solid var(--border);background:#f9fafb;font-size:14px;font-weight:700;cursor:pointer">+</button>'+
+      '</div>'+
+      '<button onclick="pkEditRemove('+i+')" style="width:28px;height:28px;border-radius:7px;border:none;background:#fef2f2;color:var(--red);font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0">✕</button>'+
+    '</div>';
+  }).join('');
+}
+function pkEditQty(i,d){ if(!PK_EDIT_ITEMS[i])return; PK_EDIT_ITEMS[i].qty=Math.max(1,(Number(PK_EDIT_ITEMS[i].qty)||0)+d); pkRenderEditList(); }
+function pkEditSetQty(i,v){ if(!PK_EDIT_ITEMS[i])return; var n=parseInt(v,10); PK_EDIT_ITEMS[i].qty=isNaN(n)||n<1?1:n; pkRenderEditList(); }
+function pkEditRemove(i){ PK_EDIT_ITEMS.splice(i,1); pkRenderEditList(); }
+function pkEditAddItem(){
+  // Show inventory picker
+  var wrap=document.getElementById('pk-edit-list'); if(!wrap) return;
+  var existing=PK_EDIT_ITEMS.map(function(it){return it.itemId;});
+  var avail=INV.filter(function(x){return existing.indexOf(x.id)===-1;}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  var picker=document.createElement('div'); picker.id='pk-edit-picker';
+  picker.style.cssText='position:absolute;inset:0;background:#fff;z-index:2;display:flex;flex-direction:column;overflow:hidden';
+  picker.innerHTML='<div style="padding:12px 14px;border-bottom:1px solid var(--border)"><input id="pk-edit-q" placeholder="Search inventory…" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box"></div>'+
+    '<div id="pk-edit-pick-list" style="overflow-y:auto;flex:1;padding:4px 10px"></div>'+
+    '<button onclick="document.getElementById(\'pk-edit-picker\').remove()" style="margin:8px 14px 14px;padding:11px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>';
+  wrap.parentElement.style.position='relative';
+  wrap.parentElement.appendChild(picker);
+  function renderPick(q){
+    q=(q||'').toLowerCase();
+    var items=avail.filter(function(x){return !q||(x.name||'').toLowerCase().indexOf(q)>-1;}).slice(0,50);
+    var list=document.getElementById('pk-edit-pick-list'); if(!list)return;
+    list.innerHTML=items.map(function(x){
+      return '<div onclick="pkEditAddInvItem(\''+x.id+'\')" style="padding:10px 8px;border-bottom:1px solid #f3f4f6;cursor:pointer;display:flex;justify-content:space-between;align-items:center">'+
+        '<div><div style="font-size:14px;font-weight:600">'+escHtmlPk(x.name)+'</div><div style="font-size:11px;color:var(--text3)">'+(x.category||'Other')+' · stock: '+(x.qty||0)+' '+(x.unit||'')+'</div></div>'+
+        '<span style="font-size:13px;font-weight:800;color:var(--blue)">+ Add</span></div>';
+    }).join('');
+  }
+  renderPick('');
+  var qi=document.getElementById('pk-edit-q');
+  if(qi){ qi.addEventListener('input',function(){renderPick(this.value);}); setTimeout(function(){qi.focus();},60); }
+}
+function pkEditAddInvItem(invId){
+  var inv=INV.find(function(x){return x.id===invId;}); if(!inv) return;
+  PK_EDIT_ITEMS.push({itemId:inv.id,name:inv.name,qty:1,unit:inv.unit||'',cat:inv.category||'Other'});
+  var picker=document.getElementById('pk-edit-picker'); if(picker) picker.remove();
+  pkRenderEditList();
+}
+function pkEditSave(){
+  if(!PK_EDIT_ITEMS.length){ alert('Cannot save an empty list. Add items or reject the request.'); return; }
+  if(!PK_EDIT_ID) return;
+  ov('Saving...');
+  api('updatePickRequest',{id:PK_EDIT_ID,items:JSON.stringify(PK_EDIT_ITEMS)}).then(function(res){
+    hov();
+    if(!res||!res.ok){ alert('Could not save: '+((res&&res.msg)||'')); return; }
+    // Update local data
+    var r=PK_REQS.find(function(x){return x.id===PK_EDIT_ID;}); if(r) r.items=PK_EDIT_ITEMS;
+    pkCloseEdit();
     renderPickAdmin();
   });
 }
