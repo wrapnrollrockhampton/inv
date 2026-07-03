@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.5</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.6</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -2966,6 +2966,7 @@ function resetSKUPreviewStyle(){
 }
 function clearSKUPreview(){g('sku-preview').style.display='none';}
 function openAddItem(){
+  RC_EDIT_FROM_SCAN=null;
   g('m-item-title').textContent='Add Item';
   g('i-sku').value='';g('i-name').value='';g('i-unit').value='';
   g('i-qty').value='0';g('i-thr').value='10';g('i-id').value='';
@@ -2975,6 +2976,8 @@ function openAddItem(){
   g('i-msg').innerHTML='';clearSKUPreview();resetSKUPreviewStyle();om('m-item');
 }
 function openEditItem(id){
+  RC_EDIT_FROM_SCAN=null;
+  var qh=g('i-qty-hint'); if(qh&&qh.dataset.def){ qh.textContent=qh.dataset.def; }
   var it=INV.find(function(i){return i.id===id;});if(!it)return;
   g('m-item-title').textContent='Edit Item';
   g('i-sku').value=it.sku;g('i-name').value=it.name;g('i-cat').value=it.cat;
@@ -3065,6 +3068,14 @@ function saveItem(){
     cm('m-item');
     renderInv(); renderDash();
     updateDashOrdersCount&&updateDashOrdersCount();
+    // If this edit came from a Stock-In "add to existing" flow, clear that scanned row
+    if(RC_EDIT_FROM_SCAN){
+      var ci=RC_NEW.findIndex(function(x){return x.code===RC_EDIT_FROM_SCAN;});
+      if(ci>-1) RC_NEW.splice(ci,1);
+      RC_EDIT_FROM_SCAN=null;
+      if(typeof rcRender==='function') rcRender();
+      if(typeof rcUpdateBar==='function') rcUpdateBar();
+    }
     // Persist in background
     api('updateItem',{itemId:id,sku:sku,name:name,cat:cat,qty:qty,unit:unit,threshold:thr,username:(U?U.username:''),supplierSku:supplierSku,supplierName:supplierName,cost:cost}).then(function(r){
       if(!r.ok){ alert('Could not save changes: '+r.msg); loadAll(); }
@@ -3282,7 +3293,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='6.5';
+var APP_VER='6.6';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -5899,15 +5910,22 @@ function rcRenderExistList(q){
       '<span style="font-size:13px;font-weight:800;color:var(--blue);flex-shrink:0">Select →</span></div>';
   }).join('');
 }
+var RC_EDIT_FROM_SCAN=null;
 function rcMapToExisting(invId){
   var idx=RC_EXIST_IDX; if(idx<0||idx>=RC_NEW.length){ rcCloseExisting(); return; }
   var it=RC_NEW[idx];
   var inv=INV.find(function(x){return x.id===invId;}); if(!inv){ rcCloseExisting(); return; }
-  // Move NEW → KNOWN as an overwrite update to the existing item
-  RC_KNOWN.push({id:inv.id, code:it.code, name:(it.name||inv.name), unit:inv.unit||it.unit||'EA', curQty:(inv.qty||0), qty:it.qty, cartons:(it.cartons||it.qty), cost:it.cost, pack:(it.pack||1), inv:inv, overwrite:true});
-  RC_NEW.splice(idx,1);
   rcCloseExisting();
-  rcRender(); rcUpdateBar();
+  // Open the item detail form pre-filled so the user can review/adjust BEFORE saving
+  openEditItem(inv.id);                                    // loads existing values (clears RC_EDIT_FROM_SCAN)
+  if(it.name) g('i-name').value=it.name;                   // scanned name (override — editable)
+  g('i-supplier-sku').value=it.code||inv.supplierSku||'';  // scanned supplier ID
+  g('i-supplier-name').value=RC_SUP||inv.supplierName||'';
+  if(it.cost!=null) g('i-cost').value=it.cost;             // scanned cost
+  var newQty=(Number(inv.qty)||0)+(Number(it.qty)||0);
+  g('i-qty').value=newQty;                                 // existing + received (editable)
+  var hint=g('i-qty-hint'); if(hint){ hint.dataset.def=hint.dataset.def||hint.textContent; hint.textContent='Was '+(Number(inv.qty)||0)+' + '+(Number(it.qty)||0)+' received = '+newQty+' (adjust if needed)'; hint.style.display='block'; }
+  RC_EDIT_FROM_SCAN=it.code;                               // remove this scanned row from the list after save
 }
 
 g('rc-raw-toggle').addEventListener('click',function(){var b=g('rc-raw');var on=b.style.display==='none';b.style.display=on?'block':'none';this.textContent=on?'Hide what the scan read ▴':'Show what the scan read ▾';});
