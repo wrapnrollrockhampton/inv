@@ -135,6 +135,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 
 /* ── PINPAD LOGIN ── */
 .lg-userselect{width:100%;padding:13px 14px;border:1.5px solid #e5e7eb;border-radius:14px;font-size:15px;font-weight:600;font-family:inherit;color:#111;background:#f9fafb url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>") no-repeat right 14px center;-webkit-appearance:none;appearance:none;outline:none;cursor:pointer}
+.lg-usergrid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:14px;min-height:44px}
+.lg-namebtn{padding:10px 16px;border:1.5px solid #e5e7eb;border-radius:12px;background:#f9fafb;font-size:14px;font-weight:600;font-family:inherit;color:#111;cursor:pointer;transition:all .12s;-webkit-tap-highlight-color:transparent}
+.lg-namebtn:active{transform:scale(.96)}
+.lg-namebtn.sel{border-color:var(--blue);background:var(--blue-bg);color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.lg-loading{color:#9ca3af;font-size:13px;padding:12px;width:100%;text-align:center}
 .lg-userselect:focus{border-color:var(--blue);background-color:#fff}
 .lg-dots{display:flex;gap:14px;justify-content:center;margin:16px 0 16px;height:13px}
 .lg-dot{width:12px;height:12px;border-radius:50%;border:1.6px solid var(--text3);transition:all .12s}
@@ -481,11 +486,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
     </div>
     <div id="lmsg"></div>
 
-    <!-- DEFAULT: pick name from dropdown + PIN pad -->
+    <!-- DEFAULT: tap your name + PIN pad -->
     <div id="lg-pinmode">
-      <select class="lg-userselect" id="lg-user-select" onchange="lgSelectFromDropdown(this.value)">
-        <option value="">Select your name…</option>
-      </select>
+      <div class="lg-usergrid" id="lg-user-grid"><div class="lg-loading">Loading names…</div></div>
       <div class="lg-dots" id="lg-dots"></div>
       <div class="lg-pad" id="lg-pad"></div>
       <button class="lg-link" onclick="lgShowManual()">Enter username instead</button>
@@ -533,7 +536,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.8</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.9</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1322,25 +1325,29 @@ function lgShowManual(){ g('lg-pinmode').style.display='none'; g('lg-manual').st
 var LG_USERS=[], LG_SEL=null, LG_ENTRY='';
 
 function loadLoginUsers(){
+  // Show cached names INSTANTLY (return visits) while fresh list loads in background
+  try{ var cu=localStorage.getItem('wr_loginusers'); if(cu){ LG_USERS=JSON.parse(cu); renderLgUserGrid(); } }catch(e){}
   api('getLoginUsers').then(function(r){
-    LG_USERS=(r.ok&&r.data)?r.data:[];
-    populateLgDropdown();
-  }).catch(function(){ populateLgDropdown(); });
+    LG_USERS=(r.ok&&r.data)?r.data:LG_USERS;
+    try{ localStorage.setItem('wr_loginusers',JSON.stringify(LG_USERS)); }catch(e){}
+    renderLgUserGrid();
+  }).catch(function(){ renderLgUserGrid(); });
 }
-function populateLgDropdown(){
-  var sel=g('lg-user-select'); if(!sel) return;
+function renderLgUserGrid(){
+  var box=g('lg-user-grid'); if(!box) return;
+  if(!LG_USERS.length){ box.innerHTML='<div class="lg-loading">No users — tap "Enter username instead"</div>'; return; }
   var list=LG_USERS.slice().sort(function(a,b){return String(a.fullname).localeCompare(String(b.fullname));});
-  var opts='<option value="">Select your name…</option>';
-  opts+=list.map(function(u){ return '<option value="'+encodeURIComponent(u.username)+'">'+u.fullname+'</option>'; }).join('');
-  sel.innerHTML=opts;
-  if(!LG_USERS.length){ sel.innerHTML='<option value="">No users — tap "Enter username instead"</option>'; }
-  LG_SEL=null; LG_ENTRY=''; renderLgDots();
+  box.innerHTML=list.map(function(u){
+    var sel=LG_SEL&&LG_SEL.username===u.username;
+    return '<button class="lg-namebtn'+(sel?' sel':'')+'" onclick="lgSelectUser(\''+encodeURIComponent(u.username)+'\')">'+escHtmlPk(u.fullname)+'</button>';
+  }).join('');
 }
 function lgCurLen(){ return LG_SEL?(LG_SEL.pinLen||4):4; }
-function lgSelectFromDropdown(val){
+function lgSelectUser(val){
   var un=val?decodeURIComponent(val):'';
   LG_SEL=un?LG_USERS.find(function(x){return x.username===un;}):null;
   LG_ENTRY=''; renderLgDots(); g('lmsg').innerHTML='';
+  renderLgUserGrid(); // re-render to highlight the selected name
 }
 function renderLgDots(){
   var d=g('lg-dots'); if(!d) return; d.className='lg-dots';
@@ -3319,7 +3326,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='6.8';
+var APP_VER='6.9';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
