@@ -2,7 +2,7 @@
 // Update strategy: network-first for HTML/version so devices always get the latest;
 // only cache *successful* responses (never broken/partial ones) to avoid white screens.
 // The app also polls version.json and force-reloads (clearing caches) when the version changes.
-var CACHE_NAME = 'wraproll-v7.0';
+var CACHE_NAME = 'wraproll-v7.2';
 var APP_SHELL = ['./index.html','./manifest.json','./logo.png'];
 
 self.addEventListener('install', function(e){
@@ -49,8 +49,8 @@ self.addEventListener('fetch', function(e){
     return;
   }
 
-  // index.html & version.json — ALWAYS network-first; only cache a fresh OK response.
-  if(url.pathname.endsWith('/') || url.pathname.endsWith('index.html') || url.pathname.endsWith('version.json')){
+  // version.json — ALWAYS network-first (tiny; drives the force-update mechanism)
+  if(url.pathname.endsWith('version.json')){
     e.respondWith(
       fetch(e.request).then(function(resp){
         if(resp && resp.ok){
@@ -58,8 +58,25 @@ self.addEventListener('fetch', function(e){
           caches.open(CACHE_NAME).then(function(cache){ cache.put(e.request, clone); });
         }
         return resp;
-      }).catch(function(){
-        return caches.match(e.request).then(function(m){ return m || caches.match('./index.html'); });
+      }).catch(function(){ return caches.match(e.request); })
+    );
+    return;
+  }
+
+  // index.html — STALE-WHILE-REVALIDATE: serve cached copy INSTANTLY (no network wait),
+  // refresh the cache in the background. The version.json poller force-reloads the app
+  // within seconds if a newer version was deployed, so briefly-stale HTML is safe.
+  if(url.pathname.endsWith('/') || url.pathname.endsWith('index.html')){
+    e.respondWith(
+      caches.match(e.request).then(function(cached){
+        var network = fetch(e.request).then(function(resp){
+          if(resp && resp.ok){
+            var clone = resp.clone();
+            caches.open(CACHE_NAME).then(function(cache){ cache.put(e.request, clone); });
+          }
+          return resp;
+        }).catch(function(){ return cached; });
+        return cached || network;   // instant if cached; falls back to network on first ever visit
       })
     );
     return;
