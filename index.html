@@ -135,10 +135,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 
 /* ── PINPAD LOGIN ── */
 .lg-userselect{width:100%;padding:13px 14px;border:1.5px solid #e5e7eb;border-radius:14px;font-size:15px;font-weight:600;font-family:inherit;color:#111;background:#f9fafb url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>") no-repeat right 14px center;-webkit-appearance:none;appearance:none;outline:none;cursor:pointer}
-.lg-usergrid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:14px;min-height:44px}
-.lg-namebtn{padding:10px 16px;border:1.5px solid #e5e7eb;border-radius:12px;background:#f9fafb;font-size:14px;font-weight:600;font-family:inherit;color:#111;cursor:pointer;transition:all .12s;-webkit-tap-highlight-color:transparent}
-.lg-namebtn:active{transform:scale(.96)}
-.lg-namebtn.sel{border-color:var(--blue);background:var(--blue-bg);color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.lg-usergrid{display:flex;flex-wrap:wrap;gap:14px 10px;justify-content:center;margin-bottom:14px;min-height:44px}
+.lg-namebtn{display:flex;flex-direction:column;align-items:center;gap:6px;width:72px;padding:6px 2px;border:none;background:transparent;font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:12px;transition:transform .12s}
+.lg-namebtn:active{transform:scale(.94)}
+.lg-avatar{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);border:3px solid transparent;transition:all .12s}
+.lg-namebtn.sel .lg-avatar{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+.lg-nametxt{font-size:11.5px;font-weight:600;color:#374151;max-width:72px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lg-namebtn.sel .lg-nametxt{color:var(--blue);font-weight:800}
 .lg-loading{color:#9ca3af;font-size:13px;padding:12px;width:100%;text-align:center}
 .lg-userselect:focus{border-color:var(--blue);background-color:#fff}
 .lg-dots{display:flex;gap:14px;justify-content:center;margin:16px 0 16px;height:13px}
@@ -536,7 +539,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.9</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.0</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1336,10 +1339,24 @@ function loadLoginUsers(){
 function renderLgUserGrid(){
   var box=g('lg-user-grid'); if(!box) return;
   if(!LG_USERS.length){ box.innerHTML='<div class="lg-loading">No users — tap "Enter username instead"</div>'; return; }
+  var AVA_COLORS=['#2563eb','#16a34a','#d97706','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d'];
+  function initials(n){
+    var p=String(n||'').trim().split(/\s+/);
+    if(!p[0]) return '?';
+    return (p.length>1 ? (p[0][0]+p[p.length-1][0]) : p[0].slice(0,2)).toUpperCase();
+  }
+  function colorFor(n){
+    var h=0; n=String(n||'');
+    for(var i=0;i<n.length;i++){ h=(h*31+n.charCodeAt(i))>>>0; }
+    return AVA_COLORS[h%AVA_COLORS.length];
+  }
   var list=LG_USERS.slice().sort(function(a,b){return String(a.fullname).localeCompare(String(b.fullname));});
   box.innerHTML=list.map(function(u){
     var sel=LG_SEL&&LG_SEL.username===u.username;
-    return '<button class="lg-namebtn'+(sel?' sel':'')+'" onclick="lgSelectUser(\''+encodeURIComponent(u.username)+'\')">'+escHtmlPk(u.fullname)+'</button>';
+    return '<button class="lg-namebtn'+(sel?' sel':'')+'" onclick="lgSelectUser(\''+encodeURIComponent(u.username)+'\')">'+
+      '<span class="lg-avatar" style="background:'+colorFor(u.username)+'">'+initials(u.fullname)+'</span>'+
+      '<span class="lg-nametxt">'+escHtmlPk(u.fullname)+'</span>'+
+    '</button>';
   }).join('');
 }
 function lgCurLen(){ return LG_SEL?(LG_SEL.pinLen||4):4; }
@@ -3326,7 +3343,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='6.9';
+var APP_VER='7.0';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
