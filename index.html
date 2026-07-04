@@ -533,7 +533,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.7</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v6.8</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1451,30 +1451,35 @@ function loadAll(){
     startTrickle(8,90);
   }
 
-  // ── Load ALL data in PARALLEL ──
+  // ── WAVE 1 — only what the first screen needs (inventory + attendance + categories) ──
   var p1=api('getInventory');
-  var p2=api('getTransactions');
   var p3=api('getAttendance',{username:((REAL_ADMIN&&REAL_ADMIN.role==='admin')||(U&&U.role==='mod'))?'':U.username});
   var p4=api('getCategories');
 
-  Promise.all([p1,p2,p3,p4]).then(function(results){
-    var r1=results[0], r2=results[1], r3=results[2], r4=results[3];
+  Promise.all([p1,p3,p4]).then(function(results){
+    var r1=results[0], r3=results[1], r4=results[2];
     INV=(r1&&r1.ok&&r1.data)?r1.data:INV;
-    TX=(r2&&r2.ok&&r2.data)?r2.data:TX;
     ATTENDANCE=(r3&&r3.ok&&r3.data)?r3.data.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):(Array.isArray(r3)?r3.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):ATTENDANCE); 
     CATEGORIES=(r4&&r4.ok&&r4.data&&r4.data.length)?r4.data:(CATEGORIES.length?CATEGORIES:[{name:'Dry Goods',icon:'🌾'},{name:'Frozen',icon:'❄️'},{name:'Beverage',icon:'🥤'},{name:'Meat',icon:'🥩'}]);
     fillCategoryUI();
 
     try{
       localStorage.setItem('wr_inv',JSON.stringify(INV));
-      localStorage.setItem('wr_tx',JSON.stringify(TX));
       localStorage.setItem('wr_att',JSON.stringify(ATTENDANCE));
       localStorage.setItem('wr_cat',JSON.stringify(CATEGORIES));
     }catch(e){}
 
     stopTrickle();
     quickRender();
-    if(!hasCache){ setLoadPct(100); setTimeout(hov,120); } // only had the overlay on first load
+    if(!hasCache){ setLoadPct(100); setTimeout(hov,120); }
+
+    // ── WAVE 2 — background, non-blocking (recent transactions + order suggestions) ──
+    api('getTransactions',{limit:300}).then(function(rt){
+      TX=(rt&&rt.ok&&rt.data)?rt.data:TX;
+      try{ localStorage.setItem('wr_tx',JSON.stringify(TX)); }catch(e){}
+      if(typeof renderAna==='function') renderAna();
+      if(typeof renderDash==='function') renderDash();
+    });
     loadOrderSuggestions();
   }).catch(function(err){
     console.error('loadAll error',err);
@@ -2696,10 +2701,15 @@ function renderAna(){
   }).join('')||'<div class="empty-state"><p>No transactions</p></div>';
 }
 function exportCSV(){
-  var hdr=['Time','User','SKU','Item','Type','Qty','Stock After','Note'];
-  var rows=TX.map(function(t){return[t.time,t.user,t.sku,t.itemName,t.type,t.qty,t.after,t.note||''];});
-  var csv=[hdr].concat(rows).map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
-  var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download='warehouse.csv';a.click();
+  ov('Preparing full export...');
+  api('getTransactions').then(function(r){   // no limit → full history for the export
+    hov();
+    var all=(r&&r.ok&&r.data)?r.data:TX;
+    var hdr=['Time','User','SKU','Item','Type','Qty','Stock After','Note'];
+    var rows=all.map(function(t){return[t.time,t.user,t.sku,t.itemName,t.type,t.qty,t.after,t.note||''];});
+    var csv=[hdr].concat(rows).map(function(r2){return r2.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+    var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download='warehouse.csv';a.click();
+  }).catch(function(){ hov(); });
 }
 
 // ════ ADMIN ════
@@ -3309,7 +3319,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='6.7';
+var APP_VER='6.8';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
