@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.3</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.4</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1045,11 +1045,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
           Set either <b>Hourly Rate</b> or <b>Daily Rate</b>. Daily Rate overrides Hourly if both are set.
         </div>
         <div class="fld"><label>Employment Type</label>
-          <select id="u-emptype">
+          <select id="u-emptype" onchange="empTypeApplyRates()">
             <option value="casual">Casual</option>
             <option value="parttime">Part-time</option>
             <option value="fulltime">Full-time</option>
+            <option value="custom">Custom (flat — no loading)</option>
           </select>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">Picking a type auto-fills Super/Sat/Sun/PH per the Fast Food Award (editable after)</div>
         </div>
         <div class="fld-row">
           <div class="fld"><label>Hourly Rate ($)</label><input type="number" id="u-rate" value="0" min="0" step="0.01" inputmode="decimal"></div>
@@ -3281,6 +3283,18 @@ function deleteUserConfirm(){
     cm('m-user');renderAdmin();
   });
 }
+// Auto-fill award multipliers when the employment type changes (MA000003, FY2026-27):
+// Sat 1.25x, Sun 1.5x, Public Holiday 2.25x, Super 12% (from 1 Jul 2026).
+// Custom = flat: all 1x, super 0 (fixed-agreement staff). Values stay editable.
+function empTypeApplyRates(){
+  var t=g('u-emptype')?g('u-emptype').value:'';
+  if(!t) return;
+  if(t==='custom'){
+    g('u-sat').value=1; g('u-sun').value=1; g('u-ph').value=1; g('u-super').value=0;
+  } else {
+    g('u-sat').value=1.25; g('u-sun').value=1.5; g('u-ph').value=2.25; g('u-super').value=12;
+  }
+}
 function saveUser(){
   var id=g('u-id').value;
   var isEdit=!!id;
@@ -3391,7 +3405,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='7.3';
+var APP_VER='7.4';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4338,7 +4352,7 @@ function tsGenerate(){
 }
 function tsRender(warn){
   var t=TS_LAST; if(!t) return;
-  var ET={fulltime:'Full-time',parttime:'Part-time',casual:'Casual'};
+  var ET={fulltime:'Full-time',parttime:'Part-time',casual:'Casual',custom:'Custom'};
   var html='<div id="ts-print" style="background:#fff;padding:18px;font-family:Arial,Helvetica,sans-serif;color:#111;min-width:640px">'+
     '<div style="text-align:center;margin-bottom:4px;font-size:18px;font-weight:800">Wrap&amp;Roll Rockhampton — Weekly Timesheet</div>'+
     '<div style="text-align:center;font-size:12px;color:#555;margin-bottom:14px">Week '+safeNewDate(t.from).toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' – '+safeNewDate(t.to).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})+'</div>'+
