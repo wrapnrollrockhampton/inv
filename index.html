@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.4</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.5</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3405,7 +3405,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='7.4';
+var APP_VER='7.5';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4397,7 +4397,15 @@ function tsExportImg(){
   loadHtml2Canvas(function(){
     html2canvas(el,{scale:2,backgroundColor:'#fff'}).then(function(canvas){
       hov();
-      var a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download=tsFileName('png'); a.click();
+      canvas.toBlob(function(blob){
+        var fname=tsFileName('png');
+        // Share sheet on iOS/Android → "Save Image" stores straight into the photo library
+        if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],fname,{type:'image/png'})]})){
+          navigator.share({files:[new File([blob],fname,{type:'image/png'})],title:'Timesheet'}).catch(function(){});
+        } else {
+          var a=document.createElement('a'); a.download=fname; a.href=URL.createObjectURL(blob); a.click();
+        }
+      },'image/png');
     }).catch(function(){ hov(); });
   });
 }
