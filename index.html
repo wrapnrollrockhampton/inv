@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.6</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.7</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1045,13 +1045,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
           Set either <b>Hourly Rate</b> or <b>Daily Rate</b>. Daily Rate overrides Hourly if both are set.
         </div>
         <div class="fld"><label>Employment Type</label>
-          <select id="u-emptype">
+          <select id="u-emptype" onchange="empTypeApplyRates()">
             <option value="casual">Casual</option>
             <option value="parttime">Part-time</option>
             <option value="fulltime">Full-time</option>
             <option value="custom">Custom (flat — no loading)</option>
           </select>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px">Used by <b>Timesheet Export only</b> (award rates auto-applied there). The Super/Sat/Sun/PH fields below are for the internal payroll report.</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">Picking a type auto-fills Super/Sat/Sun/PH below. These rates are used by the <b>Timesheet Export only</b> — the internal payroll report always pays flat 1× with 0% super.</div>
         </div>
         <div class="fld-row">
           <div class="fld"><label>Hourly Rate ($)</label><input type="number" id="u-rate" value="0" min="0" step="0.01" inputmode="decimal"></div>
@@ -3283,6 +3283,18 @@ function deleteUserConfirm(){
     cm('m-user');renderAdmin();
   });
 }
+// Auto-fill award multipliers when the employment type changes (MA000003, FY2026-27):
+// Sat 1.25x, Sun 1.5x, Public Holiday 2.25x, Super 12% (from 1 Jul 2026).
+// Custom = flat 1x, super 0. These feed the TIMESHEET only (internal payroll is always flat).
+function empTypeApplyRates(){
+  var t=g('u-emptype')?g('u-emptype').value:'';
+  if(!t) return;
+  if(t==='custom'){
+    g('u-sat').value=1; g('u-sun').value=1; g('u-ph').value=1; g('u-super').value=0;
+  } else {
+    g('u-sat').value=1.25; g('u-sun').value=1.5; g('u-ph').value=2.25; g('u-super').value=12;
+  }
+}
 function saveUser(){
   var id=g('u-id').value;
   var isEdit=!!id;
@@ -3393,7 +3405,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='7.6';
+var APP_VER='7.7';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -3507,10 +3519,13 @@ var PAYROLL_SELECTED = {}; // id → true
 var PAYROLL_CAL_OFFSET = 0; // 0=this month, -1=last month, etc.
 
 function getDayMult(dateStr, user){
+  // INTERNAL payroll is flat by agreement: every day of the year pays 1x, no penalty loading.
+  // Labels (Sat/Sun/PH) are kept for display only. The Sat/Sun/PH/Super rates in Edit User
+  // are used ONLY by the Timesheet Export (tsMult) for the accountant's reverse allocation.
   var d=safeNewDate(dateStr), dow=d.getDay();
-  if(PH_QLD.indexOf(dateStr)>-1) return {m:parseFloat(user.phRate)||1, label:'PH'};
-  if(dow===6) return {m:parseFloat(user.satRate)||1, label:'Sat'};
-  if(dow===0) return {m:parseFloat(user.sunRate)||1, label:'Sun'};
+  if(PH_QLD.indexOf(dateStr)>-1) return {m:1, label:'PH'};
+  if(dow===6) return {m:1, label:'Sat'};
+  if(dow===0) return {m:1, label:'Sun'};
   return {m:1, label:''};
 }
 function calcHrsStr(ci,co){
@@ -3566,7 +3581,7 @@ function renderStaffDash(){
   var satRate=parseFloat(uCache.satRate||U.satRate)||1;
   var sunRate=parseFloat(uCache.sunRate||U.sunRate)||1;
   var phRate=parseFloat(uCache.phRate||U.phRate)||1;
-  var superRate=parseFloat(uCache.superRate!==undefined?uCache.superRate:(U?U.superRate:0))||0;
+  var superRate=0; // internal payroll: flat agreement, no super (award super only on exported timesheet)
   var uForCalc={hourlyRate:rate,dailyRate:dailyRate,satRate:satRate,sunRate:sunRate,phRate:phRate,superRate:superRate};
   var dm=getDayMult(today,uForCalc);
   var ciToday=safeTime(todayRec&&todayRec.checkIn?todayRec.checkIn:'');
@@ -4054,7 +4069,7 @@ function renderPayrollReportTable(){
       });
       var totalHrs=days.reduce(function(s,d){return s+d.hrs;},0);
       var totalGross=days.reduce(function(s,d){return s+d.gross;},0);
-      var totalSuper=totalGross*(parseFloat(u.superRate)||0)/100;
+      var totalSuper=0; // internal payroll: no super (timesheet-only)
       var pendingCnt=ATTENDANCE.filter(function(a){
         return a.username===u.username&&a.date>=from&&a.date<=to&&
           (!a.status||a.status==='Pending'||a.status==='Requested')&&!!a.checkOut;
@@ -4268,17 +4283,16 @@ async function exportPayrollPDF(){
 // back to that gross. Employment type (full/part-time/casual) is shown and used
 // for sanity caps.
 var TS_WEEK_OFFSET=-1, TS_USERS=[], TS_LAST=null;
-// Award multipliers used ONLY on the exported timesheet (MA000003, FY2026-27):
-// Sat 1.25x · Sun 1.5x · Public holiday 2.25x · Super 12%. 'Custom' = flat 1x, super 0.
-function tsAwardMult(dateStr, empType){
-  if(empType==='custom') return {m:1,label:''};
+// Multipliers used ONLY on the exported timesheet — read from the user's Edit User fields
+// (auto-filled by Employment Type, editable). Internal payroll ignores these (always 1x).
+function tsMult(dateStr, u){
   var d=safeNewDate(dateStr), dow=d.getDay();
-  if(PH_QLD.indexOf(dateStr)>-1) return {m:2.25,label:'PH'};
-  if(dow===6) return {m:1.25,label:'Sat'};
-  if(dow===0) return {m:1.5,label:'Sun'};
+  if(PH_QLD.indexOf(dateStr)>-1) return {m:parseFloat(u.phRate)||1,label:'PH'};
+  if(dow===6) return {m:parseFloat(u.satRate)||1,label:'Sat'};
+  if(dow===0) return {m:parseFloat(u.sunRate)||1,label:'Sun'};
   return {m:1,label:''};
 }
-function tsSuperPct(empType){ return empType==='custom'?0:12; }
+function tsSuperPct(u){ return parseFloat(u.superRate)||0; }
 function tsInit(){
   tsUpdateLabel();
   var sel=g('ts-emp'); if(!sel) return;
@@ -4324,12 +4338,11 @@ function tsGenerate(){
   if(gross<=0){ alert('Weekly gross is $0 — nothing to allocate.'); return; }
   // 2) Allocate hours evenly across the days actually worked, weighted by day-type rate
   var workedDates=Object.keys(workedSet).sort();
-  var et=u.empType||'casual';
-  var sumM=workedDates.reduce(function(s,d2){return s+tsAwardMult(d2,et).m;},0);
+  var sumM=workedDates.reduce(function(s,d2){return s+tsMult(d2,u).m;},0);
   var hEach=Math.round((gross/(rate*sumM))*4)/4;           // even hours per day, 0.25h steps
   var rows=[], allocated=0;
   workedDates.forEach(function(d2,idx){
-    var am=tsAwardMult(d2,et); var m=am.m, lbl=am.label;
+    var am=tsMult(d2,u); var m=am.m, lbl=am.label;
     var hrs;
     if(idx===workedDates.length-1){
       hrs=Math.round(((gross-allocated)/(rate*m))*100)/100; // last day absorbs rounding so total = gross
@@ -4344,7 +4357,7 @@ function tsGenerate(){
     rows.push({date:d2,mult:m,lbl:lbl,hrs:hrs,amt:amt,start:tsMin2Time(sMin),finish:tsMin2Time(eMin),brk:brk});
   });
   var totalHrs=rows.reduce(function(s,r){return s+r.hrs;},0);
-  var superR=tsSuperPct(et);
+  var superR=tsSuperPct(u);
   var superAmt=Math.round(gross*superR)/100;
   var warn=(u.empType==='fulltime'&&totalHrs>38)?'Full-time over 38h — hours beyond 38 are normally overtime':(rows.some(function(r){return r.hrs>11;})?'Some days exceed 11h — check rates/attendance':'');
   TS_LAST={u:u,rows:rows,gross:gross,totalHrs:totalHrs,superAmt:superAmt,superPct:superR,from:from,to:to};
@@ -4505,7 +4518,7 @@ function renderPayrollDayDetail(){
     var hrs=co?calcHrsStr(ci,co):0;
     var dmi=getDayMult(rec.date,u);
     var gross=calcGross(hrs,u,dmi.m,rec.rateMode);
-    var super_=gross*(parseFloat(u.superRate)||0)/100;
+    var super_=0; // internal payroll: no super (timesheet-only)
     // Always show actual times; add "(Daily rate)" badge when applicable
     var timeInfo=(ci?ci+' – '+(co||'in progress'):'—')+(hrs>0?' · '+hrs.toFixed(1)+' hrs':'');
     var rateBadge=shiftMode==='daily'?
