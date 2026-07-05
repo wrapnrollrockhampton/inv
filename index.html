@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.0</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.1</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3431,7 +3431,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='8.0';
+var APP_VER='8.1';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4384,7 +4384,7 @@ function tsGenerate(){
   var dayInfo=workedDates.map(function(d2){
     var am=tsMult(d2,u);
     var isSunPH=(am.label==='Sun'||am.label==='PH');
-    return {date:d2,m:am.m,lbl:am.label,maxH:isSunPH?6:8,winStart:isSunPH?600:540,winEnd:isSunPH?960:1020,hrs:0};
+    return {date:d2,m:am.m,lbl:am.label,maxH:isSunPH?6:7,winStart:isSunPH?600:540,winEnd:960,hrs:0};
   });
 
   // ── EVEN distribution: same hours every day, capped by daily max ──
