@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.7</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.8</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1051,8 +1051,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
             <option value="fulltime">Full-time</option>
             <option value="custom">Custom (flat — no loading)</option>
           </select>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px">Picking a type auto-fills Super/Sat/Sun/PH below. These rates are used by the <b>Timesheet Export only</b> — the internal payroll report always pays flat 1× with 0% super.</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">Picking a type auto-fills Timesheet Rate + Super/Sat/Sun/PH below. These are used by the <b>Timesheet Export only</b> — the internal payroll report always uses Hourly/Daily Rate, flat 1×, 0% super.</div>
         </div>
+        <div class="fld"><label>Timesheet Rate ($/h — award, for exported timesheet)</label><input type="number" id="u-tsrate" value="0" min="0" step="0.01" inputmode="decimal"></div>
         <div class="fld-row">
           <div class="fld"><label>Hourly Rate ($)</label><input type="number" id="u-rate" value="0" min="0" step="0.01" inputmode="decimal"></div>
           <div class="fld"><label>Daily Rate ($)</label><input type="number" id="u-daily" value="0" min="0" step="0.01" inputmode="decimal"></div>
@@ -3236,6 +3237,7 @@ function openAddUser(){
   setPinLen('u',4);
   g('u-rate').value='0';g('u-daily').value='0';g('u-super').value='11.5';g('u-sat').value='1.25';g('u-sun').value='1.5';g('u-ph').value='2.0';
   if(g('u-emptype')) g('u-emptype').value='casual';
+  if(g('u-tsrate')) g('u-tsrate').value='0';
   g('u-msg').innerHTML='';
   if(g('u-allowed-menus')) g('u-allowed-menus').value='';
   if(g('u-delete-btn')) g('u-delete-btn').style.display='none';
@@ -3263,6 +3265,7 @@ function openEditUser(username,fullname,role,hourlyRate,satRate,sunRate,phRate,s
   var uu=ADM_USERS.find(function(x){return x.username===username;});
   if(g('u-allowed-menus')) g('u-allowed-menus').value=(uu&&uu.allowedMenus)?uu.allowedMenus:'';
   if(g('u-emptype')) g('u-emptype').value=(uu&&uu.empType)?uu.empType:'casual';
+  if(g('u-tsrate')) g('u-tsrate').value=(uu&&uu.tsRate)?uu.tsRate:0;
   setPinLen('u', (uu&&uu.pinLen===6)?6:4);
   togglePayrollFields();
   // Show delete button — but not for the built-in admin or the current user
@@ -3291,8 +3294,11 @@ function empTypeApplyRates(){
   if(!t) return;
   if(t==='custom'){
     g('u-sat').value=1; g('u-sun').value=1; g('u-ph').value=1; g('u-super').value=0;
+    if(g('u-tsrate')) g('u-tsrate').value=0; // 0 = timesheet falls back to the real Hourly Rate
   } else {
     g('u-sat').value=1.25; g('u-sun').value=1.5; g('u-ph').value=2.25; g('u-super').value=12;
+    // Suggested MA000003 Level 1 base (FY2026-27): casual $34.76 (incl. 25% loading), permanent $27.81
+    if(g('u-tsrate')) g('u-tsrate').value=(t==='casual'?34.76:27.81);
   }
 }
 function saveUser(){
@@ -3310,6 +3316,7 @@ function saveUser(){
   var sun=parseFloat(g('u-sun').value)||1.0;
   var ph=parseFloat(g('u-ph').value)||1.0;
   var empType=g('u-emptype')?g('u-emptype').value:'casual';
+  var tsRate=parseFloat(g('u-tsrate')?g('u-tsrate').value:0)||0;
   // collect allowed menus if mod
   var allowedMenus='';
   if(role==='mod'){
@@ -3324,7 +3331,7 @@ function saveUser(){
   ov(isEdit?'Saving...':'Creating...');
   if(isEdit){
     var renaming = un && un!==String(id).toLowerCase();
-    api('updateUser',{username:id,newUsername:(renaming?un:''),password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType}).then(function(r){
+    api('updateUser',{username:id,newUsername:(renaming?un:''),password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate}).then(function(r){
       hov();if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
       // If the admin renamed their own currently-logged-in account, update the local session
       if(renaming && U && String(U.username).toLowerCase()===String(id).toLowerCase()){
@@ -3336,7 +3343,7 @@ function saveUser(){
       cm('m-user');renderAdmin();
     });
   } else {
-    api('addUser',{username:un,password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType}).then(function(r){
+    api('addUser',{username:un,password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate}).then(function(r){
       hov();if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
       ALL_USERS_CACHE=[];
       cm('m-user');renderAdmin();
@@ -3405,7 +3412,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='7.7';
+var APP_VER='7.8';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4318,8 +4325,8 @@ function tsMin2Time(mins){ var h=Math.floor(mins/60),m=Math.round(mins%60); retu
 function tsGenerate(){
   var un=g('ts-emp')?g('ts-emp').value:''; if(!un){ alert('Select an employee first'); return; }
   var u=TS_USERS.find(function(x){return x.username===un;}); if(!u){ alert('Employee not found'); return; }
-  var rate=parseFloat(u.hourlyRate)||0;
-  if(rate<=0){ alert('Set an Hourly Rate for this employee first (Admin → Edit User)'); return; }
+  var rate=parseFloat(u.tsRate)||parseFloat(u.hourlyRate)||0;   // award rate for the timesheet; falls back to real rate
+  if(rate<=0){ alert('Set a Timesheet Rate (or Hourly Rate) for this employee first (Admin → Edit User)'); return; }
   var mon=tsMon(), ds=[], i;
   for(i=0;i<7;i++){ var d=new Date(mon); d.setDate(mon.getDate()+i); ds.push(localDateStr(d)); }
   var from=ds[0], to=ds[6];
@@ -4350,17 +4357,21 @@ function tsGenerate(){
     } else { hrs=hEach; }
     var amt=Math.round(hrs*rate*m*100)/100;
     allocated+=amt;
-    var start=(lbl?'08:00':'08:30');                         // weekends/PH start earlier
-    var sMin=(start==='08:00'?480:510);
+    // Shift windows: Mon–Sat 9:00–17:00 · Sunday & public holidays 10:00–16:00
+    var isSunPH=(lbl==='Sun'||lbl==='PH');
+    var winStart=isSunPH?600:540, winEnd=isSunPH?960:1020;
     var brk=hrs>=5?30:0;                                    // unpaid meal break on 5h+ shifts
-    var eMin=sMin+Math.round(hrs*60)+brk;
+    var dur=Math.round(hrs*60)+brk;
+    var sMin=winStart;
+    if(sMin+dur>winEnd) sMin=Math.max(winStart, winEnd-dur); // keep the shift inside the window when it fits
+    var eMin=sMin+dur;
     rows.push({date:d2,mult:m,lbl:lbl,hrs:hrs,amt:amt,start:tsMin2Time(sMin),finish:tsMin2Time(eMin),brk:brk});
   });
   var totalHrs=rows.reduce(function(s,r){return s+r.hrs;},0);
   var superR=tsSuperPct(u);
   var superAmt=Math.round(gross*superR)/100;
   var warn=(u.empType==='fulltime'&&totalHrs>38)?'Full-time over 38h — hours beyond 38 are normally overtime':(rows.some(function(r){return r.hrs>11;})?'Some days exceed 11h — check rates/attendance':'');
-  TS_LAST={u:u,rows:rows,gross:gross,totalHrs:totalHrs,superAmt:superAmt,superPct:superR,from:from,to:to};
+  TS_LAST={u:u,rate:rate,rows:rows,gross:gross,totalHrs:totalHrs,superAmt:superAmt,superPct:superR,from:from,to:to};
   tsRender(warn);
 }
 function tsRender(warn){
@@ -4372,7 +4383,7 @@ function tsRender(warn){
     '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:12px">'+
       '<div><b>Employee:</b> '+escHtmlPk(t.u.fullname)+'</div>'+
       '<div><b>Employment type:</b> '+(ET[t.u.empType]||'Casual')+'</div>'+
-      '<div><b>Base rate:</b> $'+(parseFloat(t.u.hourlyRate)||0).toFixed(2)+'/h</div>'+
+      '<div><b>Base rate:</b> $'+(t.rate||0).toFixed(2)+'/h</div>'+
     '</div>'+
     '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
       '<thead><tr style="background:#1e3a8a;color:#fff">'+
@@ -4382,7 +4393,7 @@ function tsRender(warn){
         '<th style="padding:7px 9px;text-align:right">Amount</th></tr></thead><tbody>'+
     t.rows.map(function(r){
       var d=safeNewDate(r.date);
-      var rateTxt='$'+((parseFloat(t.u.hourlyRate)||0)*r.mult).toFixed(2)+(r.lbl?' ('+r.lbl+' '+r.mult+'×)':'');
+      var rateTxt='$'+((t.rate||0)*r.mult).toFixed(2)+(r.lbl?' ('+r.lbl+' '+r.mult+'×)':'');
       return '<tr>'+
         '<td style="padding:6px 9px;border-bottom:1px solid #eee">'+d.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'})+'</td>'+
         '<td style="padding:6px 9px;border-bottom:1px solid #eee">'+d.toLocaleDateString('en-AU',{weekday:'short'})+(r.lbl?' <span style="color:#b45309;font-weight:700;font-size:10px">'+r.lbl+'</span>':'')+'</td>'+
