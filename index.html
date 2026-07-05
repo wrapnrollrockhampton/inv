@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.8</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v7.9</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1054,6 +1054,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
           <div style="font-size:11px;color:var(--text2);margin-top:4px">Picking a type auto-fills Timesheet Rate + Super/Sat/Sun/PH below. These are used by the <b>Timesheet Export only</b> — the internal payroll report always uses Hourly/Daily Rate, flat 1×, 0% super.</div>
         </div>
         <div class="fld"><label>Timesheet Rate ($/h — award, for exported timesheet)</label><input type="number" id="u-tsrate" value="0" min="0" step="0.01" inputmode="decimal"></div>
+        <div class="fld" id="u-weeklypay-wrap" style="display:none">
+          <label>Fixed Weekly Salary ($) — for Full-time timesheet</label>
+          <input type="number" id="u-weeklypay" value="0" min="0" step="0.01" inputmode="decimal">
+          <div style="font-size:10px;color:var(--text2);margin-top:3px">Full-time only: timesheet uses this fixed amount instead of attendance gross</div>
+        </div>
         <div class="fld-row">
           <div class="fld"><label>Hourly Rate ($)</label><input type="number" id="u-rate" value="0" min="0" step="0.01" inputmode="decimal"></div>
           <div class="fld"><label>Daily Rate ($)</label><input type="number" id="u-daily" value="0" min="0" step="0.01" inputmode="decimal"></div>
@@ -3238,6 +3243,8 @@ function openAddUser(){
   g('u-rate').value='0';g('u-daily').value='0';g('u-super').value='11.5';g('u-sat').value='1.25';g('u-sun').value='1.5';g('u-ph').value='2.0';
   if(g('u-emptype')) g('u-emptype').value='casual';
   if(g('u-tsrate')) g('u-tsrate').value='0';
+  if(g('u-weeklypay')) g('u-weeklypay').value='0';
+  var wp=g('u-weeklypay-wrap'); if(wp) wp.style.display='none';
   g('u-msg').innerHTML='';
   if(g('u-allowed-menus')) g('u-allowed-menus').value='';
   if(g('u-delete-btn')) g('u-delete-btn').style.display='none';
@@ -3266,6 +3273,8 @@ function openEditUser(username,fullname,role,hourlyRate,satRate,sunRate,phRate,s
   if(g('u-allowed-menus')) g('u-allowed-menus').value=(uu&&uu.allowedMenus)?uu.allowedMenus:'';
   if(g('u-emptype')) g('u-emptype').value=(uu&&uu.empType)?uu.empType:'casual';
   if(g('u-tsrate')) g('u-tsrate').value=(uu&&uu.tsRate)?uu.tsRate:0;
+  if(g('u-weeklypay')) g('u-weeklypay').value=(uu&&uu.weeklyPay)?uu.weeklyPay:0;
+  var wpw=g('u-weeklypay-wrap'); if(wpw) wpw.style.display=((uu&&uu.empType)==='fulltime')?'block':'none';
   setPinLen('u', (uu&&uu.pinLen===6)?6:4);
   togglePayrollFields();
   // Show delete button — but not for the built-in admin or the current user
@@ -3292,12 +3301,13 @@ function deleteUserConfirm(){
 function empTypeApplyRates(){
   var t=g('u-emptype')?g('u-emptype').value:'';
   if(!t) return;
+  // Show/hide weekly salary field (full-time only)
+  var wp=g('u-weeklypay-wrap'); if(wp) wp.style.display=(t==='fulltime')?'block':'none';
   if(t==='custom'){
     g('u-sat').value=1; g('u-sun').value=1; g('u-ph').value=1; g('u-super').value=0;
-    if(g('u-tsrate')) g('u-tsrate').value=0; // 0 = timesheet falls back to the real Hourly Rate
+    if(g('u-tsrate')) g('u-tsrate').value=0;
   } else {
     g('u-sat').value=1.25; g('u-sun').value=1.5; g('u-ph').value=2.25; g('u-super').value=12;
-    // Suggested MA000003 Level 1 base (FY2026-27): casual $34.76 (incl. 25% loading), permanent $27.81
     if(g('u-tsrate')) g('u-tsrate').value=(t==='casual'?34.76:27.81);
   }
 }
@@ -3317,6 +3327,7 @@ function saveUser(){
   var ph=parseFloat(g('u-ph').value)||1.0;
   var empType=g('u-emptype')?g('u-emptype').value:'casual';
   var tsRate=parseFloat(g('u-tsrate')?g('u-tsrate').value:0)||0;
+  var weeklyPay=parseFloat(g('u-weeklypay')?g('u-weeklypay').value:0)||0;
   // collect allowed menus if mod
   var allowedMenus='';
   if(role==='mod'){
@@ -3331,7 +3342,7 @@ function saveUser(){
   ov(isEdit?'Saving...':'Creating...');
   if(isEdit){
     var renaming = un && un!==String(id).toLowerCase();
-    api('updateUser',{username:id,newUsername:(renaming?un:''),password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate}).then(function(r){
+    api('updateUser',{username:id,newUsername:(renaming?un:''),password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay}).then(function(r){
       hov();if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
       // If the admin renamed their own currently-logged-in account, update the local session
       if(renaming && U && String(U.username).toLowerCase()===String(id).toLowerCase()){
@@ -3343,7 +3354,7 @@ function saveUser(){
       cm('m-user');renderAdmin();
     });
   } else {
-    api('addUser',{username:un,password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate}).then(function(r){
+    api('addUser',{username:un,password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay}).then(function(r){
       hov();if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
       ALL_USERS_CACHE=[];
       cm('m-user');renderAdmin();
@@ -3412,7 +3423,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='7.8';
+var APP_VER='7.9';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4325,52 +4336,100 @@ function tsMin2Time(mins){ var h=Math.floor(mins/60),m=Math.round(mins%60); retu
 function tsGenerate(){
   var un=g('ts-emp')?g('ts-emp').value:''; if(!un){ alert('Select an employee first'); return; }
   var u=TS_USERS.find(function(x){return x.username===un;}); if(!u){ alert('Employee not found'); return; }
-  var rate=parseFloat(u.tsRate)||parseFloat(u.hourlyRate)||0;   // award rate for the timesheet; falls back to real rate
+  var rate=parseFloat(u.tsRate)||parseFloat(u.hourlyRate)||0;
   if(rate<=0){ alert('Set a Timesheet Rate (or Hourly Rate) for this employee first (Admin → Edit User)'); return; }
+  var isFT=(u.empType||'')==='fulltime';
   var mon=tsMon(), ds=[], i;
   for(i=0;i<7;i++){ var d=new Date(mon); d.setDate(mon.getDate()+i); ds.push(localDateStr(d)); }
   var from=ds[0], to=ds[6];
-  // 1) Gross for the week from REAL approved attendance (same math as payroll report)
-  var recs=ATTENDANCE.filter(function(a){return a.username===un&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
-  if(!recs.length){ alert('No approved attendance for this employee in that week.'); return; }
+
+  // ── Determine GROSS ──
   var gross=0, workedSet={};
-  recs.forEach(function(a){
-    var ci=safeTime(a.checkIn),co=safeTime(a.checkOut);
-    var hrs=ci&&co?calcHrsStr(ci,co):0;
-    var dmi=getDayMult(a.date,u);
-    gross+=calcGross(hrs,u,dmi.m,a.rateMode);
-    workedSet[a.date]=true;
-  });
+  if(isFT && parseFloat(u.weeklyPay)>0){
+    // Full-time fixed weekly salary → use that directly
+    gross=parseFloat(u.weeklyPay);
+  } else {
+    // Calculate from REAL approved attendance
+    var recs=ATTENDANCE.filter(function(a){return a.username===un&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
+    if(!recs.length){ alert('No approved attendance for this employee in that week.'); return; }
+    recs.forEach(function(a){
+      var ci=safeTime(a.checkIn),co=safeTime(a.checkOut);
+      var hrs=ci&&co?calcHrsStr(ci,co):0;
+      var dmi=getDayMult(a.date,u);
+      gross+=calcGross(hrs,u,dmi.m,a.rateMode);
+      workedSet[a.date]=true;
+    });
+  }
   gross=Math.round(gross*100)/100;
   if(gross<=0){ alert('Weekly gross is $0 — nothing to allocate.'); return; }
-  // 2) Allocate hours evenly across the days actually worked, weighted by day-type rate
-  var workedDates=Object.keys(workedSet).sort();
-  var sumM=workedDates.reduce(function(s,d2){return s+tsMult(d2,u).m;},0);
-  var hEach=Math.round((gross/(rate*sumM))*4)/4;           // even hours per day, 0.25h steps
-  var rows=[], allocated=0;
-  workedDates.forEach(function(d2,idx){
-    var am=tsMult(d2,u); var m=am.m, lbl=am.label;
-    var hrs;
-    if(idx===workedDates.length-1){
-      hrs=Math.round(((gross-allocated)/(rate*m))*100)/100; // last day absorbs rounding so total = gross
-      if(hrs<0)hrs=0;
-    } else { hrs=hEach; }
-    var amt=Math.round(hrs*rate*m*100)/100;
-    allocated+=amt;
-    // Shift windows: Mon–Sat 9:00–17:00 · Sunday & public holidays 10:00–16:00
-    var isSunPH=(lbl==='Sun'||lbl==='PH');
-    var winStart=isSunPH?600:540, winEnd=isSunPH?960:1020;
-    var brk=hrs>=5?30:0;                                    // unpaid meal break on 5h+ shifts
-    var dur=Math.round(hrs*60)+brk;
-    var sMin=winStart;
-    if(sMin+dur>winEnd) sMin=Math.max(winStart, winEnd-dur); // keep the shift inside the window when it fits
-    var eMin=sMin+dur;
-    rows.push({date:d2,mult:m,lbl:lbl,hrs:hrs,amt:amt,start:tsMin2Time(sMin),finish:tsMin2Time(eMin),brk:brk});
-  });
-  var totalHrs=rows.reduce(function(s,r){return s+r.hrs;},0);
+
+  // ── Allocate hours across the week ──
+  var rows=[], totalHrs=0, warn='';
+  if(isFT){
+    // FULL-TIME: fixed standard week Mon–Fri 9:00–17:00, 30-min break = 7.5h/day, 37.5h
+    rate=Math.round((gross/37.5)*100)/100;
+    var allocFT=0;
+    for(var k=0;k<5;k++){
+      var amtFT=(k===4)?Math.round((gross-allocFT)*100)/100:Math.round(7.5*rate*100)/100;
+      allocFT+=amtFT;
+      rows.push({date:ds[k],mult:1,lbl:'',hrs:7.5,amt:amtFT,start:'09:00',finish:'17:00',brk:30});
+    }
+    totalHrs=37.5;
+  } else {
+    // CASUAL / PART-TIME / CUSTOM: smart allocation across worked days
+    // Priority: fill weekdays first (cheap), then Sat, then Sun/PH (expensive)
+    // Max hours: Mon–Sat 8h (9:00–17:00), Sun/PH 6h (10:00–16:00)
+    var workedDates=Object.keys(workedSet).sort();
+    // Build day info sorted by multiplier ASC (weekdays first → get more hours)
+    var dayInfo=workedDates.map(function(d2){
+      var am=tsMult(d2,u);
+      var isSunPH=(am.label==='Sun'||am.label==='PH');
+      return {date:d2,m:am.m,lbl:am.label,maxH:isSunPH?6:8,winStart:isSunPH?600:540,winEnd:isSunPH?960:1020};
+    }).sort(function(a,b){return a.m-b.m;});
+    // Greedy fill: allocate to cheapest days first, up to their max
+    var remaining=gross, assigned=[];
+    dayInfo.forEach(function(di){
+      if(remaining<=0){ assigned.push({di:di,hrs:0}); return; }
+      var maxAmt=di.maxH*rate*di.m;
+      if(maxAmt<=remaining){
+        assigned.push({di:di,hrs:di.maxH});
+        remaining-=maxAmt;
+      } else {
+        var hrs=Math.round((remaining/(rate*di.m))*4)/4; // 15-min steps
+        hrs=Math.min(hrs,di.maxH);
+        assigned.push({di:di,hrs:hrs});
+        remaining-=(hrs*rate*di.m);
+      }
+    });
+    // Last assigned day absorbs any rounding remainder
+    if(Math.abs(remaining)>0.01){
+      for(var j=assigned.length-1;j>=0;j--){
+        if(assigned[j].hrs>0){
+          var adj=remaining/(rate*assigned[j].di.m);
+          assigned[j].hrs=Math.round((assigned[j].hrs+adj)*100)/100;
+          if(assigned[j].hrs<0) assigned[j].hrs=0;
+          break;
+        }
+      }
+    }
+    // Re-sort by date for display and build rows
+    assigned.sort(function(a,b){return a.di.date.localeCompare(b.di.date);});
+    assigned.forEach(function(a){
+      if(a.hrs<=0) return; // skip days with 0 hours
+      var di=a.di, hrs=a.hrs;
+      var amt=Math.round(hrs*rate*di.m*100)/100;
+      var brk=hrs>=5?30:0;
+      var dur=Math.round(hrs*60)+brk;
+      var sMin=di.winStart;
+      if(sMin+dur>di.winEnd) sMin=Math.max(di.winStart, di.winEnd-dur);
+      var eMin=sMin+dur;
+      rows.push({date:di.date,mult:di.m,lbl:di.lbl,hrs:hrs,amt:amt,start:tsMin2Time(sMin),finish:tsMin2Time(eMin),brk:brk});
+    });
+    totalHrs=rows.reduce(function(s,r){return s+r.hrs;},0);
+    warn=rows.some(function(r){return(r.lbl==='Sun'||r.lbl==='PH')&&r.hrs>6;})?'Sunday/PH exceeds 6h window':'';
+  }
   var superR=tsSuperPct(u);
   var superAmt=Math.round(gross*superR)/100;
-  var warn=(u.empType==='fulltime'&&totalHrs>38)?'Full-time over 38h — hours beyond 38 are normally overtime':(rows.some(function(r){return r.hrs>11;})?'Some days exceed 11h — check rates/attendance':'');
   TS_LAST={u:u,rate:rate,rows:rows,gross:gross,totalHrs:totalHrs,superAmt:superAmt,superPct:superR,from:from,to:to};
   tsRender(warn);
 }
@@ -4409,6 +4468,7 @@ function tsRender(warn){
       '<tr style="font-size:11px;color:#555"><td colspan="8" style="padding:6px 9px;text-align:right">Superannuation ('+t.superPct+'%): $'+t.superAmt.toFixed(2)+' &nbsp;·&nbsp; Gross + Super: $'+(t.gross+t.superAmt).toFixed(2)+'</td></tr>'+
     '</tfoot></table>'+
     '<div style="font-size:11px;color:#555;margin-top:22px;display:flex;justify-content:space-between;gap:12px"><div>Employee signature: ____________________</div><div>Employer signature: ____________________</div><div>Date: ______________</div></div>'+
+    (t.u.empType==='fulltime'?'<div style="font-size:10px;color:#666;margin-top:10px;text-align:center">Full-time weekly salary — 37.5 ordinary hours shown (Mon–Fri 9:00–17:00, 30-min unpaid meal break). Salary is inclusive of all loadings.</div>':'')+
     '<div style="font-size:9.5px;color:#999;margin-top:12px;text-align:center">Keep timesheet and pay records for at least 7 years (Fair Work).</div>'+
   '</div>';
   g('ts-out').innerHTML=(warn?'<div style="margin:0 8px 8px;padding:8px 12px;background:#fff7ed;border-left:3px solid var(--amber);border-radius:8px;font-size:12px;color:#92400e">⚠️ '+warn+'</div>':'')+html;
