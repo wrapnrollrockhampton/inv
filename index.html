@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.2</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.3</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3431,7 +3431,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='8.2';
+var APP_VER='8.3';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4312,20 +4312,17 @@ var TS_WEEK_OFFSET=-1, TS_USERS=[], TS_LAST=null;
 // Multipliers used ONLY on the exported timesheet — read from the user's Edit User fields
 // (auto-filled by Employment Type, editable). Internal payroll ignores these (always 1x).
 function tsMult(dateStr, u){
-  // Award multipliers for the exported timesheet (MA000003 FY2026-27).
-  // Hardcoded by empType — NOT from internal payroll fields.
-  var et=(u&&u.empType)||'casual';
-  if(et==='custom') return {m:1,label:''};
+  // Timesheet multipliers — read from Edit User fields (auto-filled by empType, editable).
+  // Internal payroll NEVER uses these (always flat 1×).
   var d=safeNewDate(dateStr), dow=d.getDay();
-  if(PH_QLD.indexOf(dateStr)>-1) return {m:2.25,label:'PH'};
-  if(dow===6) return {m:1.25,label:'Sat'};
-  if(dow===0) return {m:1.50,label:'Sun'};
+  if(PH_QLD.indexOf(dateStr)>-1) return {m:parseFloat(u.phRate)||1,label:'PH'};
+  if(dow===6) return {m:parseFloat(u.satRate)||1,label:'Sat'};
+  if(dow===0) return {m:parseFloat(u.sunRate)||1,label:'Sun'};
   return {m:1,label:''};
 }
 function tsSuperPct(u){
-  // Award super for the exported timesheet (from 1 Jul 2026 = 12%). Custom = 0.
-  var et=(u&&u.empType)||'casual';
-  return et==='custom'?0:12;
+  // Timesheet super — read from Edit User (auto-filled by empType, editable).
+  return parseFloat(u.superRate)||0;
 }
 function tsInit(){
   tsUpdateLabel();
