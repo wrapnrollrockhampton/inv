@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.3</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.4</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1065,11 +1065,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         </div>
         <div class="fld-row">
           <div class="fld"><label>Super Rate (%)</label><input type="text" id="u-super" value="11.5" inputmode="decimal"></div>
-          <div class="fld"><label>Saturday (×)</label><input type="text" id="u-sat" value="1.25" inputmode="decimal"></div>
+          <div class="fld"><label>Saturday Rate ($/h)</label><input type="text" id="u-sat" value="0" inputmode="decimal"></div>
         </div>
         <div class="fld-row">
-          <div class="fld"><label>Sunday (×)</label><input type="text" id="u-sun" value="1.5" inputmode="decimal"></div>
-          <div class="fld"><label>Public Holiday (×)</label><input type="text" id="u-ph" value="2.0" inputmode="decimal"></div>
+          <div class="fld"><label>Sunday Rate ($/h)</label><input type="text" id="u-sun" value="0" inputmode="decimal"></div>
+          <div class="fld"><label>Public Holiday Rate ($/h)</label><input type="text" id="u-ph" value="0" inputmode="decimal"></div>
         </div>
       </div>
       <div id="u-msg" style="margin-bottom:8px"></div>
@@ -3248,7 +3248,7 @@ function openAddUser(){
   if(g('u-un-hint')) g('u-un-hint').style.display='none';
   g('u-pw-label').textContent='Passcode';
   setPinLen('u',4);
-  g('u-rate').value='0';g('u-daily').value='0';g('u-super').value='11.5';g('u-sat').value='1.25';g('u-sun').value='1.5';g('u-ph').value='2.0';
+  g('u-rate').value='0';g('u-daily').value='0';g('u-super').value='0';g('u-sat').value='0';g('u-sun').value='0';g('u-ph').value='0';
   if(g('u-emptype')) g('u-emptype').value='casual';
   if(g('u-tsrate')) g('u-tsrate').value='0';
   if(g('u-weeklypay')) g('u-weeklypay').value='0';
@@ -3309,14 +3309,18 @@ function deleteUserConfirm(){
 function empTypeApplyRates(){
   var t=g('u-emptype')?g('u-emptype').value:'';
   if(!t) return;
-  // Show/hide weekly salary field (full-time only)
   var wp=g('u-weeklypay-wrap'); if(wp) wp.style.display=(t==='fulltime')?'block':'none';
   if(t==='custom'){
-    g('u-sat').value=1; g('u-sun').value=1; g('u-ph').value=1; g('u-super').value=0;
     if(g('u-tsrate')) g('u-tsrate').value=0;
+    g('u-sat').value=0; g('u-sun').value=0; g('u-ph').value=0; g('u-super').value=0;
   } else {
-    g('u-sat').value=1.25; g('u-sun').value=1.5; g('u-ph').value=2.25; g('u-super').value=12;
-    if(g('u-tsrate')) g('u-tsrate').value=(t==='casual'?34.76:27.81);
+    // MA000119 standard multipliers: Sat 1.25×, Sun 1.50×, PH 2.25×
+    var base=(t==='casual')?34.76:27.81;
+    if(g('u-tsrate')) g('u-tsrate').value=base;
+    g('u-sat').value=(base*1.25).toFixed(2);
+    g('u-sun').value=(base*1.50).toFixed(2);
+    g('u-ph').value=(base*2.25).toFixed(2);
+    g('u-super').value=12;
   }
 }
 function saveUser(){
@@ -3431,7 +3435,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='8.3';
+var APP_VER='8.4';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4311,14 +4315,15 @@ async function exportPayrollPDF(){
 var TS_WEEK_OFFSET=-1, TS_USERS=[], TS_LAST=null;
 // Multipliers used ONLY on the exported timesheet — read from the user's Edit User fields
 // (auto-filled by Employment Type, editable). Internal payroll ignores these (always 1x).
-function tsMult(dateStr, u){
-  // Timesheet multipliers — read from Edit User fields (auto-filled by empType, editable).
-  // Internal payroll NEVER uses these (always flat 1×).
+function tsDayRate(dateStr, u){
+  // Timesheet day rate ($/h) — read from Edit User fields (auto-filled by empType, editable).
+  // Internal payroll NEVER uses these (always hourlyRate × hours flat).
+  var base=parseFloat(u.tsRate)||parseFloat(u.hourlyRate)||0;
   var d=safeNewDate(dateStr), dow=d.getDay();
-  if(PH_QLD.indexOf(dateStr)>-1) return {m:parseFloat(u.phRate)||1,label:'PH'};
-  if(dow===6) return {m:parseFloat(u.satRate)||1,label:'Sat'};
-  if(dow===0) return {m:parseFloat(u.sunRate)||1,label:'Sun'};
-  return {m:1,label:''};
+  if(PH_QLD.indexOf(dateStr)>-1) return {rate:parseFloat(u.phRate)||base,label:'PH'};
+  if(dow===6) return {rate:parseFloat(u.satRate)||base,label:'Sat'};
+  if(dow===0) return {rate:parseFloat(u.sunRate)||base,label:'Sun'};
+  return {rate:base,label:''};
 }
 function tsSuperPct(u){
   // Timesheet super — read from Edit User (auto-filled by empType, editable).
@@ -4383,33 +4388,33 @@ function tsGenerate(){
   // ── Build day info with award multipliers and shift windows ──
   var workedDates=Object.keys(workedSet).sort();
   var dayInfo=workedDates.map(function(d2){
-    var am=tsMult(d2,u);
-    var isSunPH=(am.label==='Sun'||am.label==='PH');
-    return {date:d2,m:am.m,lbl:am.label,maxH:isSunPH?6:7,winStart:isSunPH?600:540,winEnd:960,hrs:0};
+    var dr=tsDayRate(d2,u);
+    var isSunPH=(dr.label==='Sun'||dr.label==='PH');
+    return {date:d2,rate:dr.rate,lbl:dr.label,maxH:isSunPH?6:7,winStart:isSunPH?600:540,winEnd:960,hrs:0};
   });
 
   // ── EVEN distribution: same hours every day, capped by daily max ──
-  var sumM=dayInfo.reduce(function(s,di){return s+di.m;},0);
-  var hEven=gross/(rate*sumM);
+  var sumR=dayInfo.reduce(function(s,di){return s+di.rate;},0);
+  var hEven=sumR>0?(gross/sumR):0;
 
   // Full-time: ensure total ≥ 38h
   if(isFT){
     var nDays=dayInfo.length;
-    if(hEven*nDays<38) hEven=38/nDays;
+    if(hEven*nDays<38 && nDays>0) hEven=38/nDays;
   }
 
   // Apply caps then redistribute overflow
   var overflow=0;
   dayInfo.forEach(function(di){
-    if(hEven>di.maxH){ di.hrs=di.maxH; overflow+=(hEven-di.maxH)*rate*di.m; }
+    if(hEven>di.maxH){ di.hrs=di.maxH; overflow+=(hEven-di.maxH)*di.rate; }
     else { di.hrs=hEven; }
   });
   // Redistribute overflow to uncapped days
   if(overflow>0.01){
     var uncapped=dayInfo.filter(function(di){return di.hrs<di.maxH;});
     if(uncapped.length){
-      var sumM2=uncapped.reduce(function(s,di){return s+di.m;},0);
-      var extra=overflow/(rate*sumM2);
+      var sumR2=uncapped.reduce(function(s,di){return s+di.rate;},0);
+      var extra=sumR2>0?(overflow/sumR2):0;
       uncapped.forEach(function(di){ di.hrs=Math.min(di.hrs+extra,di.maxH); });
     }
   }
@@ -4421,7 +4426,7 @@ function tsGenerate(){
   var rows=[], tsGross=0;
   dayInfo.forEach(function(di){
     if(di.hrs<=0) return;
-    var amt=Math.round(di.hrs*rate*di.m*100)/100;
+    var amt=Math.round(di.hrs*di.rate*100)/100;
     tsGross+=amt;
     var brk=di.hrs>=5?30:0;
     var dur=Math.round(di.hrs*60)+brk;
@@ -4439,10 +4444,10 @@ function tsGenerate(){
     for(var j=rows.length-1;j>=0;j--){
       if(!rows[j].lbl){ // weekday
         var excess=tsGross-(gross+5);
-        var trimH=excess/(rate*rows[j].mult);
+        var trimH=rows[j].rate>0?(excess/rows[j].rate):0;
         rows[j].hrs=Math.floor((rows[j].hrs-trimH)*12)/12;
         if(rows[j].hrs<0.5) rows[j].hrs=0.5;
-        rows[j].amt=Math.round(rows[j].hrs*rate*rows[j].mult*100)/100;
+        rows[j].amt=Math.round(rows[j].hrs*rows[j].rate*100)/100;
         // recalc finish
         var brk2=rows[j].hrs>=5?30:0;
         var dur2=Math.round(rows[j].hrs*60)+brk2;
@@ -4483,7 +4488,7 @@ function tsRender(warn){
         '<th style="padding:7px 9px;text-align:right">Amount</th></tr></thead><tbody>'+
     t.rows.map(function(r){
       var d=safeNewDate(r.date);
-      var rateTxt='$'+((t.rate||0)*r.mult).toFixed(2)+(r.lbl?' ('+r.lbl+' '+r.mult+'×)':'');
+      var rateTxt='$'+(r.rate||0).toFixed(2)+(r.lbl?' ('+r.lbl+')':'');
       return '<tr>'+
         '<td style="padding:6px 9px;border-bottom:1px solid #eee">'+d.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'})+'</td>'+
         '<td style="padding:6px 9px;border-bottom:1px solid #eee">'+d.toLocaleDateString('en-AU',{weekday:'short'})+(r.lbl?' <span style="color:#b45309;font-weight:700;font-size:10px">'+r.lbl+'</span>':'')+'</td>'+
