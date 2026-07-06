@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.5</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.6</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3435,7 +3435,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='8.5';
+var APP_VER='8.6';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4385,37 +4385,65 @@ function tsGenerate(){
   gross=Math.round(gross*100)/100;
   if(gross<=0){ alert('Weekly gross is $0 — nothing to allocate.'); return; }
 
-  // ── Build day info with award multipliers and shift windows ──
-  var workedDates=Object.keys(workedSet).sort();
-  var dayInfo=workedDates.map(function(d2){
+  // ── Build day info with shift windows ──
+  // maxH: Mon–Sat 8h (9:00–16:00 + overtime if needed), Sun/PH 6h (10:00–16:00)
+  function tsBuildDay(d2){
     var dr=tsDayRate(d2,u);
     var isSunPH=(dr.label==='Sun'||dr.label==='PH');
-    return {date:d2,rate:dr.rate,lbl:dr.label,maxH:isSunPH?6:7,winStart:isSunPH?600:540,winEnd:960,hrs:0};
-  });
+    return {date:d2,rate:dr.rate,lbl:dr.label,maxH:isSunPH?6:8,winStart:isSunPH?600:540,winEnd:isSunPH?960:1020,hrs:0};
+  }
+  var workedDates=Object.keys(workedSet).sort();
+  var dayInfo=workedDates.map(tsBuildDay);
 
-  // ── EVEN distribution: same hours every day, capped by daily max ──
-  var sumR=dayInfo.reduce(function(s,di){return s+di.rate;},0);
-  var hEven=sumR>0?(gross/sumR):0;
-
-  // Full-time: ensure total ≥ 38h
-  if(isFT){
-    var nDays=dayInfo.length;
-    if(hEven*nDays<38 && nDays>0) hEven=38/nDays;
+  // ── EVEN distribution with iterative expansion ──
+  // If all days are maxed and gross is still not fully allocated,
+  // expand to include Saturday then Sunday automatically.
+  function tsAllocate(days){
+    var sumR=days.reduce(function(s,di){return s+di.rate;},0);
+    if(sumR<=0) return 0;
+    var hEven=gross/sumR;
+    // Full-time: ensure ≥38h
+    if(isFT && hEven*days.length<38 && days.length>0) hEven=Math.max(hEven,38/days.length);
+    // Apply caps + redistribute overflow iteratively
+    var changed=true;
+    while(changed){
+      changed=false; var overflow=0;
+      days.forEach(function(di){
+        if(di.hrs>0 && di.hrs>=di.maxH) return; // already capped
+        if(hEven>di.maxH){ di.hrs=di.maxH; overflow+=(hEven-di.maxH)*di.rate; changed=true; }
+        else { di.hrs=hEven; }
+      });
+      if(overflow>0.01){
+        var uncapped=days.filter(function(di){return di.hrs<di.maxH;});
+        if(uncapped.length){
+          var sr2=uncapped.reduce(function(s,di){return s+di.rate;},0);
+          hEven=sr2>0?((gross-days.filter(function(di){return di.hrs>=di.maxH;}).reduce(function(s,di){return s+di.hrs*di.rate;},0))/sr2):0;
+        } else { break; }
+      }
+    }
+    return days.reduce(function(s,di){return s+di.hrs*di.rate;},0);
   }
 
-  // Apply caps then redistribute overflow
-  var overflow=0;
-  dayInfo.forEach(function(di){
-    if(hEven>di.maxH){ di.hrs=di.maxH; overflow+=(hEven-di.maxH)*di.rate; }
-    else { di.hrs=hEven; }
-  });
-  // Redistribute overflow to uncapped days
-  if(overflow>0.01){
-    var uncapped=dayInfo.filter(function(di){return di.hrs<di.maxH;});
-    if(uncapped.length){
-      var sumR2=uncapped.reduce(function(s,di){return s+di.rate;},0);
-      var extra=sumR2>0?(overflow/sumR2):0;
-      uncapped.forEach(function(di){ di.hrs=Math.min(di.hrs+extra,di.maxH); });
+  var allocated=tsAllocate(dayInfo);
+
+  // If under-allocated, try adding Saturday (if not already included)
+  if(allocated<gross*0.98){
+    var satDate=ds[5]; // Saturday
+    if(!workedSet[satDate]){
+      dayInfo.push(tsBuildDay(satDate));
+      dayInfo.sort(function(a,b){return a.date.localeCompare(b.date);});
+      dayInfo.forEach(function(di){di.hrs=0;}); // reset
+      allocated=tsAllocate(dayInfo);
+    }
+  }
+  // If still under-allocated, try adding Sunday
+  if(allocated<gross*0.98){
+    var sunDate=ds[6]; // Sunday
+    if(!workedSet[sunDate]){
+      dayInfo.push(tsBuildDay(sunDate));
+      dayInfo.sort(function(a,b){return a.date.localeCompare(b.date);});
+      dayInfo.forEach(function(di){di.hrs=0;});
+      allocated=tsAllocate(dayInfo);
     }
   }
 
