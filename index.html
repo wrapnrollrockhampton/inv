@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.6</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.7</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3435,7 +3435,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='8.6';
+var APP_VER='8.7';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4447,8 +4447,12 @@ function tsGenerate(){
     }
   }
 
-  // ── ROUND to nearest 5 minutes (ceil) so gross ≥ actual ──
-  dayInfo.forEach(function(di){ di.hrs=Math.ceil(di.hrs*12)/12; });
+  // ── ROUND to nearest 5 minutes (ceil), then to 2 decimal places ──
+  // Amount is calculated from the DISPLAYED hours so the math visually checks out
+  dayInfo.forEach(function(di){
+    di.hrs=Math.ceil(di.hrs*12)/12;          // ceil to 5-min increment
+    di.hrs=Math.round(di.hrs*100)/100;       // round to 2dp for display consistency
+  });
 
   // ── Build rows with times ──
   var rows=[], tsGross=0;
