@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.7</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.8</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3435,7 +3435,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='8.7';
+var APP_VER='8.8';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4498,7 +4498,15 @@ function tsGenerate(){
 
   var superR=tsSuperPct(u);
   var superAmt=Math.round(tsGross*superR)/100;
-  TS_LAST={u:u,rate:rate,rows:rows,gross:tsGross,totalHrs:totalHrs,superAmt:superAmt,superPct:superR,from:from,to:to,actualGross:gross};
+  // Xero breakdown: Ordinary (Mon-Fri) / Saturday / Sunday / PH
+  var ordHrs=0,ordAmt=0,satHrs=0,satAmt=0,sunHrs=0,sunAmt=0,phHrs=0,phAmt=0;
+  rows.forEach(function(r){
+    if(r.lbl==='PH'){ phHrs+=r.hrs; phAmt+=r.amt; }
+    else if(r.lbl==='Sat'){ satHrs+=r.hrs; satAmt+=r.amt; }
+    else if(r.lbl==='Sun'){ sunHrs+=r.hrs; sunAmt+=r.amt; }
+    else { ordHrs+=r.hrs; ordAmt+=r.amt; }
+  });
+  TS_LAST={u:u,rate:rate,rows:rows,gross:tsGross,totalHrs:totalHrs,superAmt:superAmt,superPct:superR,from:from,to:to,actualGross:gross,ordHrs:ordHrs,ordAmt:ordAmt,satHrs:satHrs,satAmt:satAmt,sunHrs:sunHrs,sunAmt:sunAmt,phHrs:phHrs,phAmt:phAmt};
   tsRender(warn);
 }
 function tsRender(warn){
@@ -4533,8 +4541,17 @@ function tsRender(warn){
     }).join('')+
     '</tbody><tfoot>'+
       '<tr style="background:#f3f4f6;font-weight:800"><td colspan="5" style="padding:8px 9px;text-align:right">TOTAL</td><td style="padding:8px 9px;text-align:right">'+t.totalHrs.toFixed(2)+'</td><td></td><td style="padding:8px 9px;text-align:right">$'+t.gross.toFixed(2)+'</td></tr>'+
-      '<tr style="font-size:11px;color:#555"><td colspan="8" style="padding:6px 9px;text-align:right">Superannuation ('+t.superPct+'%): $'+t.superAmt.toFixed(2)+' &nbsp;·&nbsp; Gross + Super: $'+(t.gross+t.superAmt).toFixed(2)+'</td></tr>'+
     '</tfoot></table>'+
+    '<div style="margin-top:10px;border:1.5px solid #e5e7eb;border-radius:10px;overflow:hidden;font-size:12px">'+
+      '<div style="background:#f8fafc;padding:7px 12px;font-weight:800;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e5e7eb">Xero Summary</div>'+
+      '<table style="width:100%;border-collapse:collapse">'+
+        '<tr><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">Ordinary Hours <span style="color:#9ca3af">(Mon–Fri)</span></td><td style="padding:7px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-weight:700">'+t.ordHrs.toFixed(2)+' hrs</td><td style="padding:7px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-weight:700">$'+t.ordAmt.toFixed(2)+'</td></tr>'+
+        '<tr><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">Saturday Hours</td><td style="padding:7px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-weight:700">'+t.satHrs.toFixed(2)+' hrs</td><td style="padding:7px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-weight:700">$'+t.satAmt.toFixed(2)+'</td></tr>'+
+        '<tr><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">Sunday Hours</td><td style="padding:7px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-weight:700">'+t.sunHrs.toFixed(2)+' hrs</td><td style="padding:7px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-weight:700">$'+t.sunAmt.toFixed(2)+'</td></tr>'+
+        (t.phHrs>0?'<tr><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">Public Holiday Hours</td><td style="padding:7px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-weight:700">'+t.phHrs.toFixed(2)+' hrs</td><td style="padding:7px 12px;text-align:right;border-bottom:1px solid #f1f5f9;font-weight:700">$'+t.phAmt.toFixed(2)+'</td></tr>':'')+
+        '<tr style="background:#f0fdf4"><td style="padding:7px 12px;font-weight:800">Superannuation ('+t.superPct+'%)</td><td style="padding:7px 12px"></td><td style="padding:7px 12px;text-align:right;font-weight:800">$'+t.superAmt.toFixed(2)+'</td></tr>'+
+      '</table>'+
+    '</div>'+
     '<div style="font-size:11px;color:#555;margin-top:22px;display:flex;justify-content:space-between;gap:12px"><div>Employee signature: ____________________</div><div>Employer signature: ____________________</div><div>Date: ______________</div></div>'+
     (t.u.empType==='fulltime'?'<div style="font-size:10px;color:#666;margin-top:10px;text-align:center">Full-time weekly salary — 37.5 ordinary hours shown (Mon–Fri 9:00–17:00, 30-min unpaid meal break). Salary is inclusive of all loadings.</div>':'')+
     '<div style="font-size:9.5px;color:#999;margin-top:12px;text-align:center">Keep timesheet and pay records for at least 7 years (Fair Work).</div>'+
