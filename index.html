@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.8</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.9</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -766,6 +766,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
     <!-- ── PAYROLL ── -->
     <div class="page" id="page-payroll">
       <div class="scard" id="payroll-report-section"></div>
+      <div class="scard">
+        <div class="scard-hd" style="display:flex;align-items:center;gap:8px">
+          <button onclick="PAYROLL_CAL_OFFSET--;renderPayrollCal()" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:#f9fafb;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">◀</button>
+          <span class="scard-title" id="payroll-cal-title" style="flex:1;text-align:center">🗓 Attendance Calendar</span>
+          <button onclick="if(PAYROLL_CAL_OFFSET<0){PAYROLL_CAL_OFFSET++;renderPayrollCal()}" id="payroll-cal-fwd" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:#f9fafb;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">▶</button>
+        </div>
+        <div id="payroll-cal" style="padding:8px 12px 12px"></div>
+      </div>
+      <div id="payroll-day-section" style="padding:0 0 12px"></div>
       <div class="scard" style="margin-bottom:12px">
         <div class="scard-hd"><span class="scard-title">📋 Timesheet Export</span></div>
         <div style="padding:12px 16px">
@@ -783,15 +792,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         </div>
         <div id="ts-out" style="padding:0 8px 12px;overflow-x:auto"></div>
       </div>
-      <div class="scard">
-        <div class="scard-hd" style="display:flex;align-items:center;gap:8px">
-          <button onclick="PAYROLL_CAL_OFFSET--;renderPayrollCal()" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:#f9fafb;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">◀</button>
-          <span class="scard-title" id="payroll-cal-title" style="flex:1;text-align:center">🗓 Attendance Calendar</span>
-          <button onclick="if(PAYROLL_CAL_OFFSET<0){PAYROLL_CAL_OFFSET++;renderPayrollCal()}" id="payroll-cal-fwd" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:#f9fafb;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">▶</button>
-        </div>
-        <div id="payroll-cal" style="padding:8px 12px 12px"></div>
-      </div>
-      <div id="payroll-day-section" style="padding:0 0 12px"></div>
     </div>
 
     <!-- ── REVENUE ── -->
@@ -3435,7 +3435,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='8.8';
+var APP_VER='8.9';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
