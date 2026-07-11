@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.3</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.4</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -791,14 +791,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
             <button onclick="TS_WEEK_OFFSET++;tsUpdateLabel()" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:#f9fafb;font-size:15px;cursor:pointer;flex-shrink:0">▶</button>
           </div>
           <button onclick="tsGenerate()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">Generate timesheet</button>
-          <div id="ts-tpl-status" style="margin-top:8px;font-size:11px;color:var(--text3);text-align:center"></div>
-          <div id="ts-tpl-upload" style="display:none;margin-top:8px;text-align:center">
-            <label style="display:inline-block;padding:8px 16px;border-radius:8px;border:1.5px dashed var(--border);background:#f9fafb;font-size:12px;font-weight:700;color:var(--blue);cursor:pointer;font-family:inherit">
-              📎 Upload Excel Template
-              <input type="file" accept=".xlsx" onchange="tsUploadTemplate(this)" style="display:none">
-            </label>
-            <div style="font-size:10px;color:var(--text3);margin-top:4px">Upload your Timesheet_Template.xlsx once — it will be used as the format for all email exports</div>
-          </div>
           <div id="ts-actions" style="display:none;gap:8px;margin-top:10px">
             <button onclick="tsExportPDF()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📄 PDF</button>
             <button onclick="tsExportImg()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖼 Image</button>
@@ -3450,7 +3442,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.3';
+var APP_VER='9.4';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4343,7 +4335,6 @@ function tsSuperPct(u){
 }
 function tsInit(){
   tsUpdateLabel();
-  tsCheckTemplate();
   var doFill=function(list){
     TS_USERS=list;
     tsRenderEmpChips();
@@ -4362,33 +4353,6 @@ function tsRenderEmpChips(){
 }
 function tsToggleEmp(enc){
   var un=decodeURIComponent(enc); if(TS_SEL[un]) delete TS_SEL[un]; else TS_SEL[un]=true; tsRenderEmpChips();
-}
-function tsCheckTemplate(){
-  api('getTimesheetTemplateStatus').then(function(r){
-    var status=g('ts-tpl-status'), upload=g('ts-tpl-upload');
-    if(r&&r.ok&&r.hasTemplate){
-      if(status) status.textContent='✓ Template ready';
-      if(upload) upload.style.display='none';
-    } else {
-      if(status) status.textContent='⚠️ Upload your Excel template to enable email export';
-      if(upload) upload.style.display='block';
-    }
-  });
-}
-function tsUploadTemplate(input){
-  if(!input.files||!input.files[0]) return;
-  var file=input.files[0];
-  var reader=new FileReader();
-  reader.onload=function(){
-    var base64=reader.result.split(',')[1];
-    ov('Uploading template...');
-    api('uploadTimesheetTemplate',{fileBase64:base64}).then(function(r){
-      hov(); input.value='';
-      if(r&&r.ok){ alert('✓ '+r.msg); tsCheckTemplate(); }
-      else { alert('Error: '+((r&&r.msg)||'Unknown')); }
-    });
-  };
-  reader.readAsDataURL(file);
 }
 function tsSelectAll(){
   TS_USERS.filter(function(u){return u.active==='TRUE'&&(u.role==='staff'||u.role==='mod'||u.role==='admin');})
