@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v8.9</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.1</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -788,6 +788,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
           <div id="ts-actions" style="display:none;gap:8px;margin-top:10px">
             <button onclick="tsExportPDF()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📄 PDF</button>
             <button onclick="tsExportImg()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖼 Image</button>
+            <button onclick="tsEmailExcel()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:#f9fafb;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📧 Excel</button>
           </div>
         </div>
         <div id="ts-out" style="padding:0 8px 12px;overflow-x:auto"></div>
@@ -3435,7 +3436,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='8.9';
+var APP_VER='9.1';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4576,6 +4577,76 @@ function tsExportImg(){
         }
       },'image/png');
     }).catch(function(){ hov(); });
+  });
+}
+function tsEmailExcel(){
+  // Generate timesheet hours for ALL active employees, email as one Excel file
+  if(!TS_USERS.length){ alert('No employees loaded'); return; }
+  var mon=tsMon(), ds=[];
+  for(var i=0;i<7;i++){ var d=new Date(mon); d.setDate(mon.getDate()+i); ds.push(localDateStr(d)); }
+  var from=ds[0], to=ds[6];
+  var employees=[];
+  var active=TS_USERS.filter(function(u){return u.active==='TRUE'&&(u.role==='staff'||u.role==='mod'||u.role==='admin');})
+    .sort(function(a,b){return String(a.fullname).localeCompare(String(b.fullname));});
+  active.forEach(function(u){
+    var rate=parseFloat(u.tsRate)||parseFloat(u.hourlyRate)||0;
+    if(rate<=0) return;
+    var isFT=(u.empType||'')==='fulltime';
+    var gross=0, workedSet={};
+    if(isFT && parseFloat(u.weeklyPay)>0){
+      gross=parseFloat(u.weeklyPay);
+      for(var k=0;k<6;k++) workedSet[ds[k]]=true;
+    }
+    var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
+    if(!isFT || !parseFloat(u.weeklyPay)){
+      if(!recs.length) return;
+      recs.forEach(function(a){
+        var ci=safeTime(a.checkIn),co=safeTime(a.checkOut);
+        var hrs=ci&&co?calcHrsStr(ci,co):0;
+        var dmi=getDayMult(a.date,u);
+        gross+=calcGross(hrs,u,dmi.m,a.rateMode);
+        workedSet[a.date]=true;
+      });
+    } else if(recs.length){
+      workedSet={}; recs.forEach(function(a){ workedSet[a.date]=true; });
+    }
+    gross=Math.round(gross*100)/100;
+    if(gross<=0) return;
+    // Run allocation (same logic as tsGenerate but simplified to get hours per day)
+    function bld(d2){ var dr=tsDayRate(d2,u); var sp=(dr.label==='Sun'||dr.label==='PH'); return {date:d2,rate:dr.rate,lbl:dr.label,maxH:sp?6:8,hrs:0}; }
+    var wrk=Object.keys(workedSet).sort();
+    var dayInfo=wrk.map(bld);
+    function alloc(days){
+      var sr=days.reduce(function(s,di){return s+di.rate;},0); if(sr<=0) return 0;
+      var he=gross/sr;
+      if(isFT && he*days.length<38 && days.length>0) he=Math.max(he,38/days.length);
+      var ch=true;
+      while(ch){ ch=false; var ov2=0;
+        days.forEach(function(di){ if(di.hrs>0&&di.hrs>=di.maxH) return; if(he>di.maxH){di.hrs=di.maxH;ov2+=(he-di.maxH)*di.rate;ch=true;}else{di.hrs=he;} });
+        if(ov2>0.01){ var uc=days.filter(function(di){return di.hrs<di.maxH;}); if(uc.length){ var sr2=uc.reduce(function(s,di){return s+di.rate;},0); he=sr2>0?((gross-days.filter(function(di){return di.hrs>=di.maxH;}).reduce(function(s,di){return s+di.hrs*di.rate;},0))/sr2):0; } else break; }
+      }
+      return days.reduce(function(s,di){return s+di.hrs*di.rate;},0);
+    }
+    var al=alloc(dayInfo);
+    if(al<gross*0.98 && !workedSet[ds[5]]){ dayInfo.push(bld(ds[5])); dayInfo.forEach(function(di){di.hrs=0;}); alloc(dayInfo); }
+    if(al<gross*0.98 && !workedSet[ds[6]]){ dayInfo.push(bld(ds[6])); dayInfo.forEach(function(di){di.hrs=0;}); alloc(dayInfo); }
+    dayInfo.forEach(function(di){ di.hrs=Math.ceil(di.hrs*12)/12; di.hrs=Math.round(di.hrs*100)/100; });
+    // Map to 7-day array [Mon..Sun]
+    var hrs7=[0,0,0,0,0,0,0];
+    dayInfo.forEach(function(di){ var idx=ds.indexOf(di.date); if(idx>=0) hrs7[idx]=di.hrs; });
+    employees.push({name:u.fullname, hrs:hrs7});
+  });
+  if(!employees.length){ alert('No employees with approved attendance this week.'); return; }
+  var data={weekFrom:from, weekTo:to, dates:ds, employees:employees};
+  api('getReportEmail').then(function(r){
+    var email=(r&&r.email)?r.email:'';
+    var input=prompt('Email timesheet for '+employees.length+' employees to:',email);
+    if(!input) return;
+    ov('Emailing timesheet...');
+    api('emailTimesheetReport',{data:JSON.stringify(data),email:input}).then(function(res){
+      hov();
+      if(res&&res.ok){ alert('✓ '+res.msg); } else { alert('Error: '+(res&&res.msg?res.msg:'Unknown')); }
+    });
   });
 }
 function tsExportPDF(){
