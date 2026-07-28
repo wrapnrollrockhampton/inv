@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.5</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.6</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3442,7 +3442,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.5';
+var APP_VER='9.6';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4096,6 +4096,12 @@ function renderPayrollReportTable(){
 
     var report=staffList.map(function(u){
       var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
+      // Deduplicate: keep only ONE record per date (prefer Modified over Approved)
+      var byDate={};
+      recs.forEach(function(a){
+        if(!byDate[a.date] || a.status==='Modified') byDate[a.date]=a;
+      });
+      recs=Object.keys(byDate).sort().map(function(k){return byDate[k];});
       var days=recs.map(function(a){
         var ci=safeTime(a.checkIn),co=safeTime(a.checkOut);
         var hrs=ci&&co?calcHrsStr(ci,co):0;
@@ -4319,7 +4325,7 @@ async function exportPayrollPDF(){
 // evenly across the days worked so day-type rates (weekday/Sat/Sun/PH) reconcile
 // back to that gross. Employment type (full/part-time/casual) is shown and used
 // for sanity caps.
-var TS_WEEK_OFFSET=-1, TS_USERS=[], TS_LAST=null, TS_SEL={};
+var TS_WEEK_OFFSET=0, TS_USERS=[], TS_LAST=null, TS_SEL={};
 // Multipliers used ONLY on the exported timesheet — read from the user's Edit User fields
 // (auto-filled by Employment Type, editable). Internal payroll ignores these (always 1x).
 function tsDayRate(dateStr, u){
@@ -4379,6 +4385,8 @@ function tsAllocUser(u, ds, from, to){
     for(var k=0;k<6;k++) workedSet[ds[k]]=true;
   }
   var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
+  // Deduplicate: one record per date (prefer Modified over Approved)
+  var _bd={};recs.forEach(function(a){if(!_bd[a.date]||a.status==='Modified')_bd[a.date]=a;});recs=Object.keys(_bd).sort().map(function(k){return _bd[k];});
   if(!isFT || !parseFloat(u.weeklyPay)){
     if(!recs.length) return null;
     recs.forEach(function(a){
