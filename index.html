@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.6</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.7</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1537,7 +1537,10 @@ function loadAll(){
 
   // ── WAVE 1 — only what the first screen needs (inventory + attendance + categories) ──
   var p1=api('getInventory');
-  var p3=api('getAttendance',{username:((REAL_ADMIN&&REAL_ADMIN.role==='admin')||(U&&U.role==='mod'))?'':U.username});
+  // Only load last 2 weeks of attendance (speeds up app significantly with large datasets)
+  var attFrom=new Date(); attFrom.setDate(attFrom.getDate()-14);
+  var attFromStr=localDateStr(attFrom);
+  var p3=api('getAttendance',{username:((REAL_ADMIN&&REAL_ADMIN.role==='admin')||(U&&U.role==='mod'))?'':U.username, dateFrom:attFromStr});
   var p4=api('getCategories');
 
   Promise.all([p1,p3,p4]).then(function(results){
@@ -3260,6 +3263,7 @@ function openAddUser(){
   if(g('u-tsrate')) g('u-tsrate').value='0';
   if(g('u-weeklypay')) g('u-weeklypay').value='0';
   var wp=g('u-weeklypay-wrap'); if(wp) wp.style.display='none';
+  tsDaysRender('0,1,2,3,4,5'); // default Mon-Sat
   g('u-msg').innerHTML='';
   if(g('u-allowed-menus')) g('u-allowed-menus').value='';
   if(g('u-delete-btn')) g('u-delete-btn').style.display='none';
@@ -3289,6 +3293,7 @@ function openEditUser(username,fullname,role,hourlyRate,satRate,sunRate,phRate,s
   if(g('u-emptype')) g('u-emptype').value=(uu&&uu.empType)?uu.empType:'casual';
   if(g('u-tsrate')) g('u-tsrate').value=(uu&&uu.tsRate)?uu.tsRate:0;
   if(g('u-weeklypay')) g('u-weeklypay').value=(uu&&uu.weeklyPay)?uu.weeklyPay:0;
+  tsDaysRender((uu&&uu.tsDays)?uu.tsDays:'0,1,2,3,4,5');
   var wpw=g('u-weeklypay-wrap'); if(wpw) wpw.style.display=((uu&&uu.empType)==='fulltime')?'block':'none';
   setPinLen('u', (uu&&uu.pinLen===6)?6:4);
   togglePayrollFields();
@@ -3320,6 +3325,7 @@ function empTypeApplyRates(){
   if(t==='custom'){
     if(g('u-tsrate')) g('u-tsrate').value=0;
     g('u-sat').value=0; g('u-sun').value=0; g('u-ph').value=0; g('u-super').value=0;
+    tsDaysSetChecks('0,1,2,3,4'); // Mon-Fri
   } else {
     // MA000119 standard multipliers: Sat 1.25×, Sun 1.50×, PH 2.25×
     var base=(t==='casual')?34.76:27.81;
@@ -3347,6 +3353,7 @@ function saveUser(){
   var empType=g('u-emptype')?g('u-emptype').value:'casual';
   var tsRate=parsePrice(g('u-tsrate')?g('u-tsrate').value:'0');
   var weeklyPay=parsePrice(g('u-weeklypay')?g('u-weeklypay').value:'0');
+  var tsDays=tsDaysGetCSV();
   // collect allowed menus if mod
   var allowedMenus='';
   if(role==='mod'){
@@ -3361,7 +3368,7 @@ function saveUser(){
   ov(isEdit?'Saving...':'Creating...');
   if(isEdit){
     var renaming = un && un!==String(id).toLowerCase();
-    api('updateUser',{username:id,newUsername:(renaming?un:''),password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay}).then(function(r){
+    api('updateUser',{username:id,newUsername:(renaming?un:''),password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay,tsDays:tsDays}).then(function(r){
       hov();if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
       // If the admin renamed their own currently-logged-in account, update the local session
       if(renaming && U && String(U.username).toLowerCase()===String(id).toLowerCase()){
@@ -3373,7 +3380,7 @@ function saveUser(){
       cm('m-user');renderAdmin();
     });
   } else {
-    api('addUser',{username:un,password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay}).then(function(r){
+    api('addUser',{username:un,password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay,tsDays:tsDays}).then(function(r){
       hov();if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
       ALL_USERS_CACHE=[];
       cm('m-user');renderAdmin();
@@ -3442,7 +3449,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.6';
+var APP_VER='9.7';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4081,21 +4088,17 @@ function renderPayrollReportTable(){
   while(cur<=end){cols.push(localDateStr(cur));cur.setDate(cur.getDate()+1);}
   var DS=['Su','Mo','Tu','We','Th','Fr','Sa'];
 
-  // Load users with payroll data
-  api('getUsers').then(function(r){
+  // Load users with payroll data + fetch attendance for this specific date range
+  // (the global ATTENDANCE only has last 2 weeks; payroll may view older weeks)
+  Promise.all([api('getUsers'), api('getAttendance',{dateFrom:from,dateTo:to})]).then(function(results){
+    var r=results[0], attR=results[1];
+    var periodAtt=(attR&&attR.ok&&attR.data)?attR.data.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):(Array.isArray(attR)?attR.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):[]); 
     try {
     var staffList=(r.ok&&r.data?r.data:[]).filter(function(u){return (u.role==='staff'||u.role==='mod'||u.role==='admin')&&u.active==='TRUE';});
     if(!staffList.length){stopLoading();wrap.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">No staff found</div>';return;}
 
-    // Debug: log ATTENDANCE status
-    var attTotal=ATTENDANCE.length;
-    var attInRange=ATTENDANCE.filter(function(a){return a.date>=from&&a.date<=to;}).length;
-    var attApproved=ATTENDANCE.filter(function(a){return a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');}).length;
-    console.log('ATTENDANCE total:',attTotal,'in range:',attInRange,'approved:',attApproved,'from:',from,'to:',to);
-    console.log('Sample record:', ATTENDANCE[0]);
-
     var report=staffList.map(function(u){
-      var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
+      var recs=periodAtt.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
       // Deduplicate: keep only ONE record per date (prefer Modified over Approved)
       var byDate={};
       recs.forEach(function(a){
@@ -4375,7 +4378,7 @@ function tsUpdateLabel(){
 }
 function tsMin2Time(mins){ var h=Math.floor(mins/60),m=Math.round(mins%60); return ('0'+h).slice(-2)+':'+('0'+m).slice(-2); }
 // ── Allocate one employee's timesheet for a week ──
-function tsAllocUser(u, ds, from, to){
+function tsAllocUser(u, ds, from, to, attData){
   var rate=parseFloat(u.tsRate)||parseFloat(u.hourlyRate)||0;
   if(rate<=0) return null;
   var isFT=(u.empType||'')==='fulltime';
@@ -4384,7 +4387,7 @@ function tsAllocUser(u, ds, from, to){
     gross=parseFloat(u.weeklyPay);
     for(var k=0;k<6;k++) workedSet[ds[k]]=true;
   }
-  var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
+  var recs=(attData||ATTENDANCE).filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
   // Deduplicate: one record per date (prefer Modified over Approved)
   var _bd={};recs.forEach(function(a){if(!_bd[a.date]||a.status==='Modified')_bd[a.date]=a;});recs=Object.keys(_bd).sort().map(function(k){return _bd[k];});
   if(!isFT || !parseFloat(u.weeklyPay)){
@@ -4400,8 +4403,16 @@ function tsAllocUser(u, ds, from, to){
   gross=Math.round(gross*100)/100;
   if(gross<=0) return null;
   function bld(d2){ var dr=tsDayRate(d2,u); var sp=(dr.label==='Sun'||dr.label==='PH'); return {date:d2,rate:dr.rate,lbl:dr.label,maxH:sp?6:8,winStart:sp?600:540,winEnd:sp?960:1020,hrs:0}; }
-  var workedDates=Object.keys(workedSet).sort();
-  var dayInfo=workedDates.map(bld);
+  // Use tsDays setting to determine which days to allocate (0=Mon..6=Sun)
+  var allowedDays=(u.tsDays||'').split(',').filter(Boolean).map(Number);
+  if(!allowedDays.length) allowedDays=[0,1,2,3,4,5]; // default Mon-Sat
+  var allocDates=[];
+  for(var di2=0;di2<7;di2++){
+    var dow2=safeNewDate(ds[di2]).getDay(); // 0=Sun..6=Sat
+    var dayIdx=(dow2===0)?6:(dow2-1); // convert to 0=Mon..6=Sun
+    if(allowedDays.indexOf(dayIdx)>-1) allocDates.push(ds[di2]);
+  }
+  var dayInfo=allocDates.map(bld);
   function alloc(days){
     var sr=days.reduce(function(s,di){return s+di.rate;},0); if(sr<=0) return 0;
     var he=gross/sr;
@@ -4415,8 +4426,7 @@ function tsAllocUser(u, ds, from, to){
     return days.reduce(function(s,di){return s+di.hrs*di.rate;},0);
   }
   var al=alloc(dayInfo);
-  if(al<gross*0.98&&!workedSet[ds[5]]){ dayInfo.push(bld(ds[5])); dayInfo.forEach(function(di){di.hrs=0;}); al=alloc(dayInfo); }
-  if(al<gross*0.98&&!workedSet[ds[6]]){ dayInfo.push(bld(ds[6])); dayInfo.forEach(function(di){di.hrs=0;}); al=alloc(dayInfo); }
+  // No auto-expand: days are controlled by user's tsDays checkboxes in Edit User
   dayInfo.forEach(function(di){ di.hrs=Math.ceil(di.hrs*12)/12; di.hrs=Math.round(di.hrs*100)/100; });
   var rows=[], tsGross=0;
   dayInfo.forEach(function(di){
@@ -4440,14 +4450,20 @@ function tsGenerate(){
   var mon=tsMon(), ds=[];
   for(var i=0;i<7;i++){ var d=new Date(mon); d.setDate(mon.getDate()+i); ds.push(localDateStr(d)); }
   var from=ds[0], to=ds[6];
-  var results=[], skipped=[];
-  selected.forEach(function(u){
-    var r=tsAllocUser(u,ds,from,to);
-    if(r) results.push(r); else skipped.push(u.fullname);
+  // Fetch attendance for this specific week (may be outside the 2-week cache)
+  ov('Loading attendance...');
+  api('getAttendance',{dateFrom:from,dateTo:to}).then(function(attR){
+    hov();
+    var attData=(attR&&attR.ok&&attR.data)?attR.data.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):(Array.isArray(attR)?attR.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):[]); 
+    var results=[], skipped=[];
+    selected.forEach(function(u){
+      var r=tsAllocUser(u,ds,from,to,attData);
+      if(r) results.push(r); else skipped.push(u.fullname);
+    });
+    if(!results.length){ alert('No data for selected employee(s).'+(skipped.length?' Skipped: '+skipped.join(', '):'')); return; }
+    TS_LAST=results;
+    tsRenderAll(skipped);
   });
-  if(!results.length){ alert('No data for selected employee(s).'+(skipped.length?' Skipped: '+skipped.join(', '):'')); return; }
-  TS_LAST=results;
-  tsRenderAll(skipped);
 }
 // Render one or more timesheets stacked
 function tsRenderAll(skipped){
@@ -4531,31 +4547,35 @@ function tsExportImg(){
   });
 }
 function tsEmailExcel(){
-  // Generate timesheet hours for SELECTED employees, email as one Excel file
   var selected=tsSelectedUsers();
   if(!selected.length){ selected=TS_USERS.filter(function(u){return u.active==='TRUE'&&(u.role==='staff'||u.role==='mod'||u.role==='admin');}); }
   if(!selected.length){ alert('No employees'); return; }
   var mon=tsMon(), ds=[];
   for(var i=0;i<7;i++){ var d=new Date(mon); d.setDate(mon.getDate()+i); ds.push(localDateStr(d)); }
   var from=ds[0], to=ds[6];
-  var employees=[];
-  selected.sort(function(a,b){return String(a.fullname).localeCompare(String(b.fullname));}).forEach(function(u){
-    var r=tsAllocUser(u,ds,from,to);
-    if(!r) return;
-    var hrs7=[0,0,0,0,0,0,0];
-    r.rows.forEach(function(row){ var idx=ds.indexOf(row.date); if(idx>=0) hrs7[idx]=row.hrs; });
-    employees.push({name:u.fullname, hrs:hrs7});
-  });
-  if(!employees.length){ alert('No approved attendance for selected employees this week.'); return; }
-  var data={weekFrom:from, weekTo:to, dates:ds, employees:employees};
-  api('getReportEmail').then(function(r){
-    var email=(r&&r.email)?r.email:'';
-    var input=prompt('Email timesheet for '+employees.length+' employee(s) to:',email);
-    if(!input) return;
-    ov('Emailing timesheet...');
-    api('emailTimesheetReport',{data:JSON.stringify(data),email:input}).then(function(res){
-      hov();
-      if(res&&res.ok){ alert('✓ '+res.msg); } else { alert('Error: '+(res&&res.msg?res.msg:'Unknown')); }
+  ov('Loading attendance...');
+  api('getAttendance',{dateFrom:from,dateTo:to}).then(function(attR){
+    hov();
+    var attData=(attR&&attR.ok&&attR.data)?attR.data.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):(Array.isArray(attR)?attR.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):[]); 
+    var employees=[];
+    selected.sort(function(a,b){return String(a.fullname).localeCompare(String(b.fullname));}).forEach(function(u){
+      var r=tsAllocUser(u,ds,from,to,attData);
+      if(!r) return;
+      var hrs7=[0,0,0,0,0,0,0];
+      r.rows.forEach(function(row){ var idx=ds.indexOf(row.date); if(idx>=0) hrs7[idx]=row.hrs; });
+      employees.push({name:u.fullname, hrs:hrs7});
+    });
+    if(!employees.length){ alert('No approved attendance for selected employees this week.'); return; }
+    var data={weekFrom:from, weekTo:to, dates:ds, employees:employees};
+    api('getReportEmail').then(function(r2){
+      var email=(r2&&r2.email)?r2.email:'';
+      var input=prompt('Email timesheet for '+employees.length+' employee(s) to:',email);
+      if(!input) return;
+      ov('Emailing timesheet...');
+      api('emailTimesheetReport',{data:JSON.stringify(data),email:input}).then(function(res){
+        hov();
+        if(res&&res.ok){ alert('✓ '+res.msg); } else { alert('Error: '+(res&&res.msg?res.msg:'Unknown')); }
+      });
     });
   });
 }
