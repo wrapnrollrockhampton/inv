@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.7</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.8</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1066,6 +1066,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
           <input type="text" id="u-weeklypay" value="0" inputmode="decimal">
           <div style="font-size:10px;color:var(--text2);margin-top:3px">Full-time only: timesheet uses this fixed amount instead of attendance gross</div>
         </div>
+        <div class="fld"><label>Timesheet Days</label>
+          <div id="u-tsdays" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+          <div style="font-size:10px;color:var(--text2);margin-top:4px">Tick the days to allocate hours on the exported timesheet</div>
+        </div>
         <div class="fld-row">
           <div class="fld"><label>Hourly Rate ($)</label><input type="text" id="u-rate" value="0" inputmode="decimal"></div>
           <div class="fld"><label>Daily Rate ($)</label><input type="text" id="u-daily" value="0" inputmode="decimal"></div>
@@ -1537,10 +1541,7 @@ function loadAll(){
 
   // ── WAVE 1 — only what the first screen needs (inventory + attendance + categories) ──
   var p1=api('getInventory');
-  // Only load last 2 weeks of attendance (speeds up app significantly with large datasets)
-  var attFrom=new Date(); attFrom.setDate(attFrom.getDate()-14);
-  var attFromStr=localDateStr(attFrom);
-  var p3=api('getAttendance',{username:((REAL_ADMIN&&REAL_ADMIN.role==='admin')||(U&&U.role==='mod'))?'':U.username, dateFrom:attFromStr});
+  var p3=api('getAttendance',{username:((REAL_ADMIN&&REAL_ADMIN.role==='admin')||(U&&U.role==='mod'))?'':U.username});
   var p4=api('getCategories');
 
   Promise.all([p1,p3,p4]).then(function(results){
@@ -3336,6 +3337,22 @@ function empTypeApplyRates(){
     g('u-super').value=12;
   }
 }
+// ── Timesheet day checkboxes ──
+var TS_DAY_LABELS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+function tsDaysRender(csvStr){
+  var box=g('u-tsdays'); if(!box) return;
+  var checked=(csvStr||'').split(',').filter(Boolean);
+  box.innerHTML=TS_DAY_LABELS.map(function(lbl,i){
+    var ch=checked.indexOf(String(i))>-1;
+    var isWknd=i>=5;
+    return '<label style="display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:8px;border:1.5px solid '+(ch?(isWknd?'var(--amber)':'var(--blue)'):'#e5e7eb')+';background:'+(ch?(isWknd?'#fff7ed':'var(--blue-bg)'):'#f9fafb')+';cursor:pointer;font-size:12px;font-weight:700;color:'+(ch?(isWknd?'var(--amber)':'var(--blue)'):'#9ca3af')+'">'+
+      '<input type="checkbox" value="'+i+'" '+(ch?'checked':'')+' style="accent-color:'+(isWknd?'var(--amber)':'var(--blue)')+'"> '+lbl+'</label>';
+  }).join('');
+}
+function tsDaysGetCSV(){
+  var box=g('u-tsdays'); if(!box) return '';
+  return Array.from(box.querySelectorAll('input[type=checkbox]:checked')).map(function(c2){return c2.value;}).join(',');
+}
 function saveUser(){
   var id=g('u-id').value;
   var isEdit=!!id;
@@ -3449,7 +3466,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.7';
+var APP_VER='9.8';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4088,17 +4105,14 @@ function renderPayrollReportTable(){
   while(cur<=end){cols.push(localDateStr(cur));cur.setDate(cur.getDate()+1);}
   var DS=['Su','Mo','Tu','We','Th','Fr','Sa'];
 
-  // Load users with payroll data + fetch attendance for this specific date range
-  // (the global ATTENDANCE only has last 2 weeks; payroll may view older weeks)
-  Promise.all([api('getUsers'), api('getAttendance',{dateFrom:from,dateTo:to})]).then(function(results){
-    var r=results[0], attR=results[1];
-    var periodAtt=(attR&&attR.ok&&attR.data)?attR.data.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):(Array.isArray(attR)?attR.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):[]); 
+  // Load users with payroll data
+  api('getUsers').then(function(r){
     try {
     var staffList=(r.ok&&r.data?r.data:[]).filter(function(u){return (u.role==='staff'||u.role==='mod'||u.role==='admin')&&u.active==='TRUE';});
     if(!staffList.length){stopLoading();wrap.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">No staff found</div>';return;}
 
     var report=staffList.map(function(u){
-      var recs=periodAtt.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
+      var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
       // Deduplicate: keep only ONE record per date (prefer Modified over Approved)
       var byDate={};
       recs.forEach(function(a){
@@ -4450,20 +4464,14 @@ function tsGenerate(){
   var mon=tsMon(), ds=[];
   for(var i=0;i<7;i++){ var d=new Date(mon); d.setDate(mon.getDate()+i); ds.push(localDateStr(d)); }
   var from=ds[0], to=ds[6];
-  // Fetch attendance for this specific week (may be outside the 2-week cache)
-  ov('Loading attendance...');
-  api('getAttendance',{dateFrom:from,dateTo:to}).then(function(attR){
-    hov();
-    var attData=(attR&&attR.ok&&attR.data)?attR.data.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):(Array.isArray(attR)?attR.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):[]); 
-    var results=[], skipped=[];
-    selected.forEach(function(u){
-      var r=tsAllocUser(u,ds,from,to,attData);
-      if(r) results.push(r); else skipped.push(u.fullname);
-    });
-    if(!results.length){ alert('No data for selected employee(s).'+(skipped.length?' Skipped: '+skipped.join(', '):'')); return; }
-    TS_LAST=results;
-    tsRenderAll(skipped);
+  var results=[], skipped=[];
+  selected.forEach(function(u){
+    var r=tsAllocUser(u,ds,from,to);
+    if(r) results.push(r); else skipped.push(u.fullname);
   });
+  if(!results.length){ alert('No data for selected employee(s).'+(skipped.length?' Skipped: '+skipped.join(', '):'')); return; }
+  TS_LAST=results;
+  tsRenderAll(skipped);
 }
 // Render one or more timesheets stacked
 function tsRenderAll(skipped){
@@ -4553,29 +4561,24 @@ function tsEmailExcel(){
   var mon=tsMon(), ds=[];
   for(var i=0;i<7;i++){ var d=new Date(mon); d.setDate(mon.getDate()+i); ds.push(localDateStr(d)); }
   var from=ds[0], to=ds[6];
-  ov('Loading attendance...');
-  api('getAttendance',{dateFrom:from,dateTo:to}).then(function(attR){
-    hov();
-    var attData=(attR&&attR.ok&&attR.data)?attR.data.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):(Array.isArray(attR)?attR.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}):[]); 
-    var employees=[];
-    selected.sort(function(a,b){return String(a.fullname).localeCompare(String(b.fullname));}).forEach(function(u){
-      var r=tsAllocUser(u,ds,from,to,attData);
-      if(!r) return;
-      var hrs7=[0,0,0,0,0,0,0];
-      r.rows.forEach(function(row){ var idx=ds.indexOf(row.date); if(idx>=0) hrs7[idx]=row.hrs; });
-      employees.push({name:u.fullname, hrs:hrs7});
-    });
-    if(!employees.length){ alert('No approved attendance for selected employees this week.'); return; }
-    var data={weekFrom:from, weekTo:to, dates:ds, employees:employees};
-    api('getReportEmail').then(function(r2){
-      var email=(r2&&r2.email)?r2.email:'';
-      var input=prompt('Email timesheet for '+employees.length+' employee(s) to:',email);
-      if(!input) return;
-      ov('Emailing timesheet...');
-      api('emailTimesheetReport',{data:JSON.stringify(data),email:input}).then(function(res){
-        hov();
-        if(res&&res.ok){ alert('✓ '+res.msg); } else { alert('Error: '+(res&&res.msg?res.msg:'Unknown')); }
-      });
+  var employees=[];
+  selected.sort(function(a,b){return String(a.fullname).localeCompare(String(b.fullname));}).forEach(function(u){
+    var r=tsAllocUser(u,ds,from,to);
+    if(!r) return;
+    var hrs7=[0,0,0,0,0,0,0];
+    r.rows.forEach(function(row){ var idx=ds.indexOf(row.date); if(idx>=0) hrs7[idx]=row.hrs; });
+    employees.push({name:u.fullname, hrs:hrs7});
+  });
+  if(!employees.length){ alert('No approved attendance for selected employees this week.'); return; }
+  var data={weekFrom:from, weekTo:to, dates:ds, employees:employees};
+  api('getReportEmail').then(function(r2){
+    var email=(r2&&r2.email)?r2.email:'';
+    var input=prompt('Email timesheet for '+employees.length+' employee(s) to:',email);
+    if(!input) return;
+    ov('Emailing timesheet...');
+    api('emailTimesheetReport',{data:JSON.stringify(data),email:input}).then(function(res){
+      hov();
+      if(res&&res.ok){ alert('✓ '+res.msg); } else { alert('Error: '+(res&&res.msg?res.msg:'Unknown')); }
     });
   });
 }
