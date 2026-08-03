@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.8</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3052,10 +3052,11 @@ function renderAdmin(){
       '</div></div>';
   }).join('')||'<div class="empty-state"><p>No items'+(admCatFilter?' in this category':' yet')+'</p></div>';
 
-  api('getUsers').then(function(r){
-    if(!r.ok||!r.data)return;
-    ADM_USERS=r.data; // cache for edit lookups (allowedMenus etc.)
-    g('adm-usr-list').innerHTML=r.data.map(function(u){
+  // Show cached users IMMEDIATELY, refresh in background
+  var renderUserList = function(data){
+    ADM_USERS=data;
+    try{ localStorage.setItem('wr_users',JSON.stringify(data)); }catch(e){}
+    g('adm-usr-list').innerHTML=data.map(function(u){
       var av=u.fullname?u.fullname[0].toUpperCase():'?';
       var isSelf = U && U.username===u.username;
       return '<div class="user-row"><div class="user-av">'+av+'</div>'+
@@ -3064,7 +3065,11 @@ function renderAdmin(){
         '<button onclick="openEditUser(\''+u.username+'\',\''+u.fullname+'\',\''+u.role+'\','+( u.hourlyRate||0)+','+(u.satRate||1.25)+','+(u.sunRate||1.5)+','+(u.phRate||2.0)+','+(u.superRate!==undefined?u.superRate:11.5)+','+(u.dailyRate||0)+')" style="padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:#f9fafb;font-size:12px;cursor:pointer;font-weight:600;flex-shrink:0">Edit</button>'+
         '</div>';
     }).join('');
-  });
+  };
+  // Show cached users instantly
+  try{ var cu=localStorage.getItem('wr_users'); if(cu) renderUserList(JSON.parse(cu)); }catch(e){}
+  // Refresh in background
+  api('getUsers').then(function(r){ if(r.ok&&r.data) renderUserList(r.data); });
   renderCatList();
 }
 var ADM_USERS=[];
@@ -3339,19 +3344,30 @@ function empTypeApplyRates(){
 }
 // ── Timesheet day checkboxes ──
 var TS_DAY_LABELS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+var TS_DAY_CHECKS=[1,1,1,1,1,1,0]; // default Mon-Sat checked
 function tsDaysRender(csvStr){
   var box=g('u-tsdays'); if(!box) return;
-  var checked=(csvStr||'').split(',').filter(Boolean);
+  var checked=(csvStr||'').split(',').filter(Boolean).map(Number);
+  TS_DAY_CHECKS=[0,0,0,0,0,0,0];
+  checked.forEach(function(i){ if(i>=0&&i<7) TS_DAY_CHECKS[i]=1; });
+  tsDaysDrawButtons();
+}
+function tsDaysDrawButtons(){
+  var box=g('u-tsdays'); if(!box) return;
   box.innerHTML=TS_DAY_LABELS.map(function(lbl,i){
-    var ch=checked.indexOf(String(i))>-1;
+    var ch=TS_DAY_CHECKS[i];
     var isWknd=i>=5;
-    return '<label style="display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:8px;border:1.5px solid '+(ch?(isWknd?'var(--amber)':'var(--blue)'):'#e5e7eb')+';background:'+(ch?(isWknd?'#fff7ed':'var(--blue-bg)'):'#f9fafb')+';cursor:pointer;font-size:12px;font-weight:700;color:'+(ch?(isWknd?'var(--amber)':'var(--blue)'):'#9ca3af')+'">'+
-      '<input type="checkbox" value="'+i+'" '+(ch?'checked':'')+' style="accent-color:'+(isWknd?'var(--amber)':'var(--blue)')+'"> '+lbl+'</label>';
+    var bg=ch?(isWknd?'#fff7ed':'var(--blue-bg)'):'#f9fafb';
+    var border=ch?(isWknd?'var(--amber)':'var(--blue)'):'#e5e7eb';
+    var color=ch?(isWknd?'var(--amber)':'var(--blue)'):'#9ca3af';
+    return '<button type="button" onclick="tsDayToggle('+i+')" style="padding:8px 14px;border-radius:10px;border:2px solid '+border+';background:'+bg+';color:'+color+';font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent">'+(ch?'✓ ':'')+lbl+'</button>';
   }).join('');
 }
+function tsDayToggle(i){ TS_DAY_CHECKS[i]=TS_DAY_CHECKS[i]?0:1; tsDaysDrawButtons(); }
 function tsDaysGetCSV(){
-  var box=g('u-tsdays'); if(!box) return '';
-  return Array.from(box.querySelectorAll('input[type=checkbox]:checked')).map(function(c2){return c2.value;}).join(',');
+  var out=[];
+  TS_DAY_CHECKS.forEach(function(v,i){ if(v) out.push(i); });
+  return out.join(',');
 }
 function saveUser(){
   var id=g('u-id').value;
@@ -3466,7 +3482,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.8';
+var APP_VER='9.9';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
