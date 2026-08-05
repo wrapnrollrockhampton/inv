@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.2</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3331,7 +3331,7 @@ function empTypeApplyRates(){
   if(t==='custom'){
     if(g('u-tsrate')) g('u-tsrate').value=0;
     g('u-sat').value=0; g('u-sun').value=0; g('u-ph').value=0; g('u-super').value=0;
-    tsDaysSetChecks('0,1,2,3,4'); // Mon-Fri
+    tsDaysRender('0,1,2,3,4'); // Mon-Fri
   } else {
     // MA000119 standard multipliers: Sat 1.25×, Sun 1.50×, PH 2.25×
     var base=(t==='casual')?34.76:27.81;
@@ -3482,7 +3482,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.9';
+var APP_VER='9.9.2';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -6007,8 +6007,30 @@ function checkVersionForce(){
 // Check shortly after load (let the app paint first), then periodically + when refocused
 window.addEventListener('load', function(){ setTimeout(checkVersionForce, 3000); });
 setInterval(checkVersionForce, 60000);
-document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') checkVersionForce(); });
-window.addEventListener('focus', checkVersionForce);
+document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible'){ checkVersionForce(); silentRefresh(); } });
+window.addEventListener('focus', function(){ checkVersionForce(); silentRefresh(); });
+
+// ── Silent background data refresh (sync between devices) ──
+var LAST_REFRESH=0;
+function silentRefresh(){
+  if(!U) return;
+  var now=Date.now();
+  if(now-LAST_REFRESH<30000) return; // max once per 30s
+  LAST_REFRESH=now;
+  var isAdminOrMod=(REAL_ADMIN&&REAL_ADMIN.role==='admin')||(U&&U.role==='mod');
+  Promise.all([
+    api('getInventory'),
+    api('getAttendance',{username:isAdminOrMod?'':U.username})
+  ]).then(function(res){
+    var r1=res[0], r3=res[1];
+    var changed=false;
+    if(r1&&r1.ok&&r1.data){ var nLen=r1.data.length; if(nLen!==INV.length){ changed=true; } INV=r1.data; try{localStorage.setItem('wr_inv',JSON.stringify(INV));}catch(e){} }
+    if(r3&&r3.ok&&r3.data){ var aLen=r3.data.length; if(aLen!==ATTENDANCE.length){ changed=true; } ATTENDANCE=r3.data.map(function(a){return Object.assign({},a,{date:safeDate(a.date)});}); try{localStorage.setItem('wr_att',JSON.stringify(ATTENDANCE));}catch(e){} }
+    if(changed && typeof quickRender==='function') quickRender();
+  }).catch(function(){});
+}
+// Also auto-refresh every 2 minutes while app is open
+setInterval(function(){ if(document.visibilityState==='visible') silentRefresh(); }, 120000);
 
 // ════════════ RECEIVE STOCK (invoice scan) ════════════
 var RC_SUP=null, RC_KNOWN=[], RC_NEW=[];
