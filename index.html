@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.7</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.8</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -941,6 +941,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
       </div>
       <div id="adm-sec-cats">
         <div class="scard" id="adm-cat-list"></div>
+      </div>
+
+      <div class="sec-hd" style="margin-top:20px;cursor:pointer" onclick="toggleAdmSection('settings')">
+        <span class="sec-title"><span class="adm-arrow" id="adm-arrow-settings">▼</span> Settings</span>
+      </div>
+      <div id="adm-sec-settings">
+        <div class="scard" style="padding:14px 16px">
+          <div class="fld">
+            <label>Default Email (for reports & timesheets)</label>
+            <div style="display:flex;gap:8px">
+              <input type="email" id="adm-email" placeholder="accountant@example.com" autocomplete="off" inputmode="email" style="flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;font-family:inherit">
+              <button onclick="admSaveEmail()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">Save</button>
+            </div>
+            <div style="font-size:10px;color:var(--text2);margin-top:4px">Used by: Stocktake Excel, Timesheet Excel, and all future email exports</div>
+            <div id="adm-email-msg" style="font-size:12px;margin-top:4px"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -3078,7 +3095,19 @@ function renderAdmin(){
   try{ var cu=localStorage.getItem('wr_users'); if(cu) renderUserList(JSON.parse(cu)); }catch(e){}
   // Refresh in background
   api('getUsers').then(function(r){ if(r.ok&&r.data) renderUserList(r.data); });
+  // Load default email
+  api('getReportEmail').then(function(r){ if(r&&r.ok&&r.email){ var e=g('adm-email'); if(e&&!e.value) e.value=r.email; } });
   renderCatList();
+}
+function admSaveEmail(){
+  var email=(g('adm-email')?g('adm-email').value:'').trim();
+  if(!email){ g('adm-email-msg').innerHTML='<span style="color:var(--red)">Enter an email</span>'; return; }
+  ov('Saving...');
+  api('setReportEmail',{email:email}).then(function(r){
+    hov();
+    if(r&&r.ok){ g('adm-email-msg').innerHTML='<span style="color:var(--green)">✓ Saved</span>'; setTimeout(function(){ g('adm-email-msg').innerHTML=''; },2000); }
+    else { g('adm-email-msg').innerHTML='<span style="color:var(--red)">Error: '+(r&&r.msg||'')+'</span>'; }
+  });
 }
 var ADM_USERS=[];
 
@@ -3459,7 +3488,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.9.7';
+var APP_VER='9.9.8';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
