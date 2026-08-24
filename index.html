@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.6</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.7</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3459,7 +3459,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.9.6';
+var APP_VER='9.9.7';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4414,8 +4414,7 @@ function tsAllocUser(u, ds, from, to, earnDays, allocDays){
   var isFT=(u.empType||'')==='fulltime';
   
   if(isFT){
-    // ── FULL-TIME: fixed standard week Mon-Fri 9:00-17:00, 7.5h/day, 37.5h ──
-    // NOT affected by earn/alloc day toggles — always uses weeklyPay or attendance gross.
+    // ── FULL-TIME: Mon-Sun with proper day rates, NOT affected by earn/alloc toggles ──
     var gross=parseFloat(u.weeklyPay)||0;
     if(gross<=0){
       var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
@@ -4429,15 +4428,36 @@ function tsAllocUser(u, ds, from, to, earnDays, allocDays){
     }
     gross=Math.round(gross*100)/100;
     if(gross<=0) return null;
-    rate=Math.round((gross/37.5)*100)/100; // effective rate = gross / 37.5h
-    var rows=[], allocFT=0;
-    for(var k=0;k<5;k++){
-      var amtFT=(k===4)?Math.round((gross-allocFT)*100)/100:Math.round(7.5*rate*100)/100;
-      allocFT+=amtFT;
-      rows.push({date:ds[k],rate:rate,lbl:'',hrs:7.5,amt:amtFT,start:'09:00',finish:'17:00',brk:30});
+    // Distribute across all 7 days (Mon-Sun) with proper day rates
+    function bldFT(d2){ var dr=tsDayRate(d2,u); var sp=(dr.label==='Sun'||dr.label==='PH'); return {date:d2,rate:dr.rate,lbl:dr.label,maxH:sp?6:8,winStart:sp?600:540,winEnd:sp?960:1020,hrs:0}; }
+    var ftDays=ds.map(bldFT);
+    var ftSumR=ftDays.reduce(function(s,di){return s+di.rate;},0);
+    var ftHEven=ftSumR>0?(gross/ftSumR):0;
+    // Ensure ≥38h
+    if(ftHEven*7<38) ftHEven=38/7;
+    // Cap + redistribute
+    var ftCh=true;
+    while(ftCh){ ftCh=false; ftDays.forEach(function(di){ if(di.hrs>0&&di.hrs>=di.maxH) return; if(ftHEven>di.maxH){di.hrs=di.maxH;ftCh=true;}else{di.hrs=ftHEven;} });
+      var ftCapped=ftDays.filter(function(di){return di.hrs>=di.maxH;});
+      var ftUc=ftDays.filter(function(di){return di.hrs<di.maxH;});
+      if(ftCapped.length&&ftUc.length){ var ftUsed=ftCapped.reduce(function(s,di){return s+di.hrs*di.rate;},0); var ftSr2=ftUc.reduce(function(s,di){return s+di.rate;},0); ftHEven=ftSr2>0?((gross-ftUsed)/ftSr2):0; } else break;
     }
-    var superR=tsSuperPct(u), superAmt=Math.round(gross*superR)/100;
-    return {u:u,rate:rate,rows:rows,gross:gross,totalHrs:37.5,superAmt:superAmt,superPct:superR,from:from,to:to,actualGross:gross,ordHrs:37.5,ordAmt:gross,satHrs:0,satAmt:0,sunHrs:0,sunAmt:0,phHrs:0,phAmt:0};
+    // Round to 5 min + 2dp
+    ftDays.forEach(function(di){ di.hrs=Math.ceil(di.hrs*12)/12; di.hrs=Math.round(di.hrs*100)/100; });
+    var rows=[], ftGross=0;
+    ftDays.forEach(function(di){
+      if(di.hrs<=0) return;
+      var amt=Math.round(di.hrs*di.rate*100)/100; ftGross+=amt;
+      var brk=di.hrs>=5?30:0, dur=Math.round(di.hrs*60)+brk;
+      var sMin=di.winStart; if(sMin+dur>di.winEnd) sMin=Math.max(di.winStart,di.winEnd-dur);
+      var eMin=Math.ceil((sMin+dur)/5)*5;
+      rows.push({date:di.date,rate:di.rate,lbl:di.lbl,hrs:di.hrs,amt:amt,start:tsMin2Time(sMin),finish:tsMin2Time(eMin),brk:brk});
+    });
+    var ftTotalHrs=rows.reduce(function(s,r){return s+r.hrs;},0);
+    var ordH=0,ordA=0,saH=0,saA=0,suH=0,suA=0,phH=0,phA=0;
+    rows.forEach(function(r){ if(r.lbl==='PH'){phH+=r.hrs;phA+=r.amt;} else if(r.lbl==='Sat'){saH+=r.hrs;saA+=r.amt;} else if(r.lbl==='Sun'){suH+=r.hrs;suA+=r.amt;} else{ordH+=r.hrs;ordA+=r.amt;} });
+    var superR=tsSuperPct(u), superAmt=Math.round(ftGross*superR)/100;
+    return {u:u,rate:rate,rows:rows,gross:ftGross,totalHrs:ftTotalHrs,superAmt:superAmt,superPct:superR,from:from,to:to,actualGross:gross,ordHrs:ordH,ordAmt:ordA,satHrs:saH,satAmt:saA,sunHrs:suH,sunAmt:suA,phHrs:phH,phAmt:phA};
   }
 
   // ── CASUAL / PART-TIME / CUSTOM: use earn/alloc day toggles ──
