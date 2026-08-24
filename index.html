@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.5</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.6</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3459,7 +3459,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.9.5';
+var APP_VER='9.9.6';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4413,28 +4413,46 @@ function tsAllocUser(u, ds, from, to, earnDays, allocDays){
   if(rate<=0) return null;
   var isFT=(u.empType||'')==='fulltime';
   
-  // ── Step 1: Calculate GROSS from earn days only ──
-  var gross=0;
-  if(isFT && parseFloat(u.weeklyPay)>0){
-    // Full-time fixed: prorate by earn days vs total work days
-    var totalWorkDays=6; // Mon-Sat default for FT
-    var earnCount=earnDays.filter(function(v){return v;}).length;
-    gross=parseFloat(u.weeklyPay) * (earnCount/totalWorkDays);
+  if(isFT){
+    // ── FULL-TIME: fixed standard week Mon-Fri 9:00-17:00, 7.5h/day, 37.5h ──
+    // NOT affected by earn/alloc day toggles — always uses weeklyPay or attendance gross.
+    var gross=parseFloat(u.weeklyPay)||0;
+    if(gross<=0){
+      var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
+      var _bd={};recs.forEach(function(a){if(!_bd[a.date]||a.status==='Modified')_bd[a.date]=a;});recs=Object.keys(_bd).sort().map(function(k){return _bd[k];});
+      if(!recs.length) return null;
+      recs.forEach(function(a){
+        var ci=safeTime(a.checkIn),co=safeTime(a.checkOut);
+        var hrs=ci&&co?calcHrsStr(ci,co):0;
+        gross+=calcGross(hrs,u,getDayMult(a.date,u).m,a.rateMode);
+      });
+    }
     gross=Math.round(gross*100)/100;
-  } else {
-    var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
-    var _bd={};recs.forEach(function(a){if(!_bd[a.date]||a.status==='Modified')_bd[a.date]=a;});recs=Object.keys(_bd).sort().map(function(k){return _bd[k];});
-    if(!recs.length) return null;
-    recs.forEach(function(a){
-      // Check if this day is in earnDays
-      var dow=safeNewDate(a.date).getDay(); var dayIdx=(dow===0)?6:(dow-1); // 0=Mon..6=Sun
-      if(!earnDays[dayIdx]) return; // skip days not counted
-      var ci=safeTime(a.checkIn),co=safeTime(a.checkOut);
-      var hrs=ci&&co?calcHrsStr(ci,co):0;
-      var dmi=getDayMult(a.date,u);
-      gross+=calcGross(hrs,u,dmi.m,a.rateMode);
-    });
+    if(gross<=0) return null;
+    rate=Math.round((gross/37.5)*100)/100; // effective rate = gross / 37.5h
+    var rows=[], allocFT=0;
+    for(var k=0;k<5;k++){
+      var amtFT=(k===4)?Math.round((gross-allocFT)*100)/100:Math.round(7.5*rate*100)/100;
+      allocFT+=amtFT;
+      rows.push({date:ds[k],rate:rate,lbl:'',hrs:7.5,amt:amtFT,start:'09:00',finish:'17:00',brk:30});
+    }
+    var superR=tsSuperPct(u), superAmt=Math.round(gross*superR)/100;
+    return {u:u,rate:rate,rows:rows,gross:gross,totalHrs:37.5,superAmt:superAmt,superPct:superR,from:from,to:to,actualGross:gross,ordHrs:37.5,ordAmt:gross,satHrs:0,satAmt:0,sunHrs:0,sunAmt:0,phHrs:0,phAmt:0};
   }
+
+  // ── CASUAL / PART-TIME / CUSTOM: use earn/alloc day toggles ──
+  var gross=0;
+  var recs=ATTENDANCE.filter(function(a){return a.username===u.username&&a.date>=from&&a.date<=to&&(a.status==='Approved'||a.status==='Modified');});
+  var _bd={};recs.forEach(function(a){if(!_bd[a.date]||a.status==='Modified')_bd[a.date]=a;});recs=Object.keys(_bd).sort().map(function(k){return _bd[k];});
+  if(!recs.length) return null;
+  recs.forEach(function(a){
+    var dow=safeNewDate(a.date).getDay(); var dayIdx=(dow===0)?6:(dow-1);
+    if(!earnDays[dayIdx]) return;
+    var ci=safeTime(a.checkIn),co=safeTime(a.checkOut);
+    var hrs=ci&&co?calcHrsStr(ci,co):0;
+    var dmi=getDayMult(a.date,u);
+    gross+=calcGross(hrs,u,dmi.m,a.rateMode);
+  });
   gross=Math.round(gross*100)/100;
   if(gross<=0) return null;
 
