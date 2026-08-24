@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.4</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.5</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -1075,10 +1075,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
           <label>Fixed Weekly Salary ($) — for Full-time timesheet</label>
           <input type="text" id="u-weeklypay" value="0" inputmode="decimal">
           <div style="font-size:10px;color:var(--text2);margin-top:3px">Full-time only: timesheet uses this fixed amount instead of attendance gross</div>
-        </div>
-        <div class="fld"><label>Timesheet Days</label>
-          <div id="u-tsdays" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
-          <div style="font-size:10px;color:var(--text2);margin-top:4px">Tick the days to allocate hours on the exported timesheet</div>
         </div>
         <div class="fld-row">
           <div class="fld"><label>Hourly Rate ($)</label><input type="text" id="u-rate" value="0" inputmode="decimal"></div>
@@ -3281,7 +3277,6 @@ function openAddUser(){
   if(g('u-tsrate')) g('u-tsrate').value='0';
   if(g('u-weeklypay')) g('u-weeklypay').value='0';
   var wp=g('u-weeklypay-wrap'); if(wp) wp.style.display='none';
-  tsDaysRender('0,1,2,3,4,5'); // default Mon-Sat
   g('u-msg').innerHTML='';
   if(g('u-allowed-menus')) g('u-allowed-menus').value='';
   if(g('u-delete-btn')) g('u-delete-btn').style.display='none';
@@ -3311,7 +3306,6 @@ function openEditUser(username,fullname,role,hourlyRate,satRate,sunRate,phRate,s
   if(g('u-emptype')) g('u-emptype').value=(uu&&uu.empType)?uu.empType:'casual';
   if(g('u-tsrate')) g('u-tsrate').value=(uu&&uu.tsRate)?uu.tsRate:0;
   if(g('u-weeklypay')) g('u-weeklypay').value=(uu&&uu.weeklyPay)?uu.weeklyPay:0;
-  tsDaysRender((uu&&uu.tsDays)?uu.tsDays:'0,1,2,3,4,5');
   var wpw=g('u-weeklypay-wrap'); if(wpw) wpw.style.display=((uu&&uu.empType)==='fulltime')?'block':'none';
   setPinLen('u', (uu&&uu.pinLen===6)?6:4);
   togglePayrollFields();
@@ -3343,7 +3337,6 @@ function empTypeApplyRates(){
   if(t==='custom'){
     if(g('u-tsrate')) g('u-tsrate').value=0;
     g('u-sat').value=0; g('u-sun').value=0; g('u-ph').value=0; g('u-super').value=0;
-    tsDaysRender('0,1,2,3,4'); // Mon-Fri
   } else {
     // MA000119 standard multipliers: Sat 1.25×, Sun 1.50×, PH 2.25×
     var base=(t==='casual')?34.76:27.81;
@@ -3353,33 +3346,6 @@ function empTypeApplyRates(){
     g('u-ph').value=(base*2.25).toFixed(2);
     g('u-super').value=12;
   }
-}
-// ── Timesheet day checkboxes ──
-var TS_DAY_LABELS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-var TS_DAY_CHECKS=[1,1,1,1,1,1,0]; // default Mon-Sat checked
-function tsDaysRender(csvStr){
-  var box=g('u-tsdays'); if(!box) return;
-  var checked=(csvStr||'').split(',').filter(Boolean).map(Number);
-  TS_DAY_CHECKS=[0,0,0,0,0,0,0];
-  checked.forEach(function(i){ if(i>=0&&i<7) TS_DAY_CHECKS[i]=1; });
-  tsDaysDrawButtons();
-}
-function tsDaysDrawButtons(){
-  var box=g('u-tsdays'); if(!box) return;
-  box.innerHTML=TS_DAY_LABELS.map(function(lbl,i){
-    var ch=TS_DAY_CHECKS[i];
-    var isWknd=i>=5;
-    var bg=ch?(isWknd?'#fff7ed':'var(--blue-bg)'):'#f9fafb';
-    var border=ch?(isWknd?'var(--amber)':'var(--blue)'):'#e5e7eb';
-    var color=ch?(isWknd?'var(--amber)':'var(--blue)'):'#9ca3af';
-    return '<button type="button" onclick="tsDayToggle('+i+')" style="padding:8px 14px;border-radius:10px;border:2px solid '+border+';background:'+bg+';color:'+color+';font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent">'+(ch?'✓ ':'')+lbl+'</button>';
-  }).join('');
-}
-function tsDayToggle(i){ TS_DAY_CHECKS[i]=TS_DAY_CHECKS[i]?0:1; tsDaysDrawButtons(); }
-function tsDaysGetCSV(){
-  var out=[];
-  TS_DAY_CHECKS.forEach(function(v,i){ if(v) out.push(i); });
-  return out.join(',');
 }
 function saveUser(){
   var id=g('u-id').value;
@@ -3398,7 +3364,6 @@ function saveUser(){
   var empType=g('u-emptype')?g('u-emptype').value:'casual';
   var tsRate=parsePrice(g('u-tsrate')?g('u-tsrate').value:'0');
   var weeklyPay=parsePrice(g('u-weeklypay')?g('u-weeklypay').value:'0');
-  var tsDays=tsDaysGetCSV();
   // collect allowed menus if mod
   var allowedMenus='';
   if(role==='mod'){
@@ -3413,7 +3378,7 @@ function saveUser(){
   ov(isEdit?'Saving...':'Creating...');
   if(isEdit){
     var renaming = un && un!==String(id).toLowerCase();
-    api('updateUser',{username:id,newUsername:(renaming?un:''),password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay,tsDays:tsDays}).then(function(r){
+    api('updateUser',{username:id,newUsername:(renaming?un:''),password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay}).then(function(r){
       hov();if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
       // If the admin renamed their own currently-logged-in account, update the local session
       if(renaming && U && String(U.username).toLowerCase()===String(id).toLowerCase()){
@@ -3425,7 +3390,7 @@ function saveUser(){
       cm('m-user');renderAdmin();
     });
   } else {
-    api('addUser',{username:un,password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay,tsDays:tsDays}).then(function(r){
+    api('addUser',{username:un,password:pw,fullname:ht,role:role,actingUser:(REAL_ADMIN?REAL_ADMIN.username:U?U.username:''),hourlyRate:rate,satRate:sat,sunRate:sun,phRate:ph,superRate:superR,dailyRate:daily,allowedMenus:allowedMenus,empType:empType,tsRate:tsRate,weeklyPay:weeklyPay}).then(function(r){
       hov();if(!r.ok){showMsg('u-msg','err','❌ '+r.msg);return;}
       ALL_USERS_CACHE=[];
       cm('m-user');renderAdmin();
@@ -3494,7 +3459,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.9.4';
+var APP_VER='9.9.5';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
