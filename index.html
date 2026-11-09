@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.8</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.9</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -963,6 +963,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
 
   </div><!-- end scroll-area -->
   </div><!-- end app-body -->
+<!-- Email Compose Modal -->
+<div id="modal-email" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div style="max-width:520px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+    <div style="padding:16px 18px;background:var(--blue);color:#fff;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700;font-size:15px">📧 Compose Email</span>
+      <button onclick="emailModalClose()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:0 4px">✕</button>
+    </div>
+    <div style="padding:16px 18px">
+      <div class="fld" style="margin-bottom:12px">
+        <label style="font-weight:600;font-size:12px;color:var(--text2)">To</label>
+        <input type="email" id="em-to" placeholder="accountant@example.com" autocomplete="off" inputmode="email" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;font-family:inherit;box-sizing:border-box">
+      </div>
+      <div class="fld" style="margin-bottom:12px">
+        <label style="font-weight:600;font-size:12px;color:var(--text2)">Subject</label>
+        <input type="text" id="em-subject" placeholder="Subject" autocomplete="off" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;font-family:inherit;box-sizing:border-box">
+      </div>
+      <div class="fld" style="margin-bottom:16px">
+        <label style="font-weight:600;font-size:12px;color:var(--text2)">Message</label>
+        <textarea id="em-body" rows="10" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;line-height:1.5"></textarea>
+      </div>
+      <div id="em-attach" style="font-size:12px;color:var(--text2);margin-bottom:14px;padding:8px 12px;background:#f9fafb;border-radius:8px">📎 Attachment: Timesheet.xlsx</div>
+      <button onclick="emailModalSend()" style="width:100%;padding:12px;border-radius:12px;border:none;background:#16a34a;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Send ✉️</button>
+    </div>
+  </div>
+</div>
 </div><!-- end #app -->
 
 <!-- ═══ FULLSCREEN SCANNER ═══ -->
@@ -3488,7 +3513,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.9.8';
+var APP_VER='9.9.9';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4640,6 +4665,7 @@ function tsExportImg(){
     }).catch(function(){ hov(); });
   });
 }
+var EM_PENDING=null; // stores email payload while modal is open
 function tsEmailExcel(){
   var selected=tsSelectedUsers();
   if(!selected.length){ selected=TS_USERS.filter(function(u){return u.active==='TRUE'&&(u.role==='staff'||u.role==='mod'||u.role==='admin');}); }
@@ -4657,15 +4683,32 @@ function tsEmailExcel(){
   });
   if(!employees.length){ alert('No approved attendance for selected employees this week.'); return; }
   var data={weekFrom:from, weekTo:to, dates:ds, employees:employees};
+  var names=employees.map(function(e){return e.name;}).join(', ');
+  // Open compose modal
+  EM_PENDING=data;
+  var defSubject='Timesheet — Week '+from+' to '+to;
+  var defBody='Dear Neon Tax Team,\n\nPlease find attached the weekly timesheet for all employees for the following pay period:\n\nPeriod: '+from+' to '+to+'\nEmployees: '+names+'\n\nThis timesheet has been reviewed and approved. Please use it as the basis for processing payroll for the above pay period.\n\nThank you for your assistance.\n\nKind regards,\nJosh\nWrap & Roll Rockhampton';
+  g('em-subject').value=defSubject;
+  g('em-body').value=defBody;
+  g('em-attach').innerHTML='📎 Attachment: Timesheet-'+from+'.xlsx ('+employees.length+' employee'+(employees.length>1?'s':'')+')';
   api('getReportEmail').then(function(r2){
-    var email=(r2&&r2.email)?r2.email:'';
-    var input=prompt('Email timesheet for '+employees.length+' employee(s) to:',email);
-    if(!input) return;
-    ov('Emailing timesheet...');
-    api('emailTimesheetReport',{data:JSON.stringify(data),email:input}).then(function(res){
-      hov();
-      if(res&&res.ok){ alert('✓ '+res.msg); } else { alert('Error: '+(res&&res.msg?res.msg:'Unknown')); }
-    });
+    g('em-to').value=(r2&&r2.email)?r2.email:'';
+    g('modal-email').style.display='';
+  });
+}
+function emailModalClose(){ g('modal-email').style.display='none'; EM_PENDING=null; }
+function emailModalSend(){
+  if(!EM_PENDING) return;
+  var email=(g('em-to').value||'').trim();
+  var subject=(g('em-subject').value||'').trim();
+  var body=g('em-body').value||'';
+  if(!email){ alert('Please enter an email address'); return; }
+  if(!subject){ alert('Please enter a subject'); return; }
+  emailModalClose();
+  ov('Emailing timesheet...');
+  api('emailTimesheetReport',{data:JSON.stringify(EM_PENDING),email:email,subject:subject,body:body}).then(function(res){
+    hov(); EM_PENDING=null;
+    if(res&&res.ok){ alert('✓ '+res.msg); } else { alert('Error: '+(res&&res.msg?res.msg:'Unknown')); }
   });
 }
 function tsExportPDF(){
