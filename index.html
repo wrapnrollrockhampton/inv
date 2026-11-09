@@ -551,7 +551,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-s
         <button class="snav-btn" id="bn-revenue" onclick="gp('revenue','Revenue')" style="display:none"><span class="snav-icon">💹</span><span>Revenue</span></button>
         <button class="snav-btn" id="bn-admin" onclick="gp('admin','Admin')" style="display:none"><span class="snav-icon">⚙️</span><span>Admin</span></button>
         <button class="snav-btn" id="bn-chpw" onclick="openChangePassword()" style="margin-top:auto"><span class="snav-icon">🔑</span><span>Passcode</span></button>
-        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.9</div>
+        <div id="app-version" style="padding:10px 14px;font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.04em;border-top:1px solid var(--border)">v9.9.10</div>
       </div>
     </div>
     <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">‹</button>
@@ -3513,7 +3513,7 @@ if(isIOS && !isStandalone && !localStorage.getItem('wr_install_dismissed')){
 
 // ════ SERVICE WORKER + ACTIVE VERSION CHECK ════
 // APP_VER must match version.json — update all three (sidebar tag, version.json, sw.js) per release
-var APP_VER='9.9.9';
+var APP_VER='9.9.10';
 var SW_REG=null;
 var UPDATE_PENDING=false;
 
@@ -4704,9 +4704,10 @@ function emailModalSend(){
   var body=g('em-body').value||'';
   if(!email){ alert('Please enter an email address'); return; }
   if(!subject){ alert('Please enter a subject'); return; }
-  emailModalClose();
+  var payload=JSON.stringify(EM_PENDING);
+  g('modal-email').style.display='none';
   ov('Emailing timesheet...');
-  api('emailTimesheetReport',{data:JSON.stringify(EM_PENDING),email:email,subject:subject,body:body}).then(function(res){
+  api('emailTimesheetReport',{data:payload,email:email,subject:subject,body:body}).then(function(res){
     hov(); EM_PENDING=null;
     if(res&&res.ok){ alert('✓ '+res.msg); } else { alert('Error: '+(res&&res.msg?res.msg:'Unknown')); }
   });
